@@ -1,17 +1,16 @@
-# Node.js
-node_modules/
-
-# React
-client/build/
-client/node_modules/
-
-# Environment variables
-.env
+# Node backend
+server/node_modules/
 server/.env
+server/.DS_Store
+
+# React frontend
+client/node_modules/
+client/build/
 client/.env
+client/.DS_Store
 
-# Logs
+# General
+node_modules/
+.env
 *.log
-
-# Mac system files
 .DS_Store
