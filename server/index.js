@@ -48,6 +48,12 @@ app.get('/api/test-create-board', async (req, res) => {
   }
 });
 
+const boardRoutes = require('./routes/boards');
+const cardRoutes = require('./routes/cards');
+
+app.use('/api/boards', boardRoutes);
+app.use('/api/cards', cardRoutes);
+
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
