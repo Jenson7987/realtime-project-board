@@ -1,4 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  DropResult
+} from '@hello-pangea/dnd';
 
 interface Card {
   _id: string;
@@ -26,108 +32,125 @@ interface BoardResponse {
 
 function BoardView() {
   const [data, setData] = useState<BoardResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [newCard, setNewCard] = useState({ title: '', description: '', column: '' });
 
   useEffect(() => {
-    fetch('/api/boards/6842134e9f8121a878d81fad') // Temporary (Replace with dynamic board selection later)
+    fetch('/api/boards/6842134e9f8121a878d81fad')
       .then(res => res.json())
-      .then(json => {
-        setData(json);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Failed to load board', err);
-        setLoading(false);
-      });
+      .then(json => setData(json))
+      .catch(console.error);
   }, []);
 
-  const handleAddCard = async () => {
-    if (!data) return;
+  const onDragEnd = (result: DropResult) => {
+    const { destination, source, draggableId } = result;
+    if (!destination || !data) return;
 
-    await fetch('/api/cards', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        boardId: data.board._id,
-        column: newCard.column,
-        title: newCard.title,
-        description: newCard.description,
-        position: 0,
-      }),
+    const updatedCards = [...data.cards];
+    const draggedCard = updatedCards.find(c => c._id === draggableId);
+    if (!draggedCard) return;
+
+    const sourceCol = source.droppableId;
+    const destCol = destination.droppableId;
+
+    const fromCards = updatedCards
+      .filter(c => c.column === sourceCol && c._id !== draggableId)
+      .sort((a, b) => a.position - b.position);
+
+    const toCards = updatedCards
+      .filter(c => c.column === destCol && c._id !== draggableId)
+      .sort((a, b) => a.position - b.position);
+
+    if (sourceCol === destCol) {
+      toCards.splice(destination.index, 0, draggedCard);
+    } else {
+      draggedCard.column = destCol;
+      toCards.splice(destination.index, 0, draggedCard);
+    }
+
+    const affected = sourceCol === destCol ? toCards : [...fromCards, ...toCards];
+
+    affected.forEach((card, i) => {
+      card.position = i;
     });
 
-    setShowModal(false);
-    setNewCard({ title: '', description: '', column: '' });
+    const newCards = updatedCards.map(c =>
+      affected.find(a => a._id === c._id) || c
+    );
 
-    // Reload
-    const res = await fetch(`/api/boards/${data.board._id}`);
-    const updated = await res.json();
-    setData(updated);
+    setData({ ...data, cards: newCards });
+
+    affected.forEach(card => {
+      fetch(`/api/cards/${card._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ column: card.column, position: card.position }),
+      }).catch(console.error);
+    });
   };
 
-  if (loading) return <p>Loading...</p>;
-  if (!data || !data.board) return <p>Board not found.</p>;
-
+  if (!data || !data.board) return <p>Loading...</p>;
   const { board, cards } = data;
 
   return (
-    <div className="board" style={{ position: 'relative' }}>
+    <div className="board" style={{ padding: '1rem' }}>
       <h1>{board.title}</h1>
-      <button onClick={() => setShowModal(true)}>+ Add Card</button>
-      <div style={{ display: 'flex', gap: '1rem' }}>
-        {board.columns.map(col => (
-          <div key={col.name} className="column" style={{ minWidth: '200px', border: '1px solid #ccc', padding: '1rem' }}>
-            <h2>{col.name}</h2>
-            {cards
-              .filter(card => card.column === col.name)
-              .sort((a, b) => a.position - b.position)
-              .map(card => (
-                <div key={card._id} className="card" style={{ margin: '0.5rem 0', padding: '0.5rem', border: '1px solid #aaa' }}>
-                  <strong>{card.title}</strong>
-                  {card.description && <p>{card.description}</p>}
+      <DragDropContext onDragEnd={onDragEnd}>
+        <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto' }}>
+          {board.columns.map(col => (
+            <Droppable droppableId={col.name} key={col.name}>
+              {(provided, snapshot) => (
+                <div
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  style={{
+                    width: '275px',
+                    minHeight: '500px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'stretch',
+                    backgroundColor: snapshot.isDraggingOver ? '#f0f0f0' : '#fafafa',
+                    border: '1px solid #ddd',
+                    borderRadius: '8px',
+                    padding: '1rem',
+                    boxSizing: 'border-box',
+                    overflowY: 'auto',
+                    flexShrink: 0,
+                  }}
+                >
+                  <h2>{col.name}</h2>
+                  {cards
+                    .filter(card => card.column === col.name)
+                    .sort((a, b) => a.position - b.position)
+                    .map((card, index) => (
+                      <Draggable draggableId={card._id} index={index} key={card._id}>
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                            style={{
+                              userSelect: 'none',
+                              padding: '0.75rem',
+                              marginBottom: '0.5rem',
+                              borderRadius: '4px',
+                              background: snapshot.isDragging ? '#fff' : '#ffffff',
+                              boxShadow: snapshot.isDragging ? '0 2px 8px rgba(0,0,0,0.2)' : 'none',
+                              border: '1px solid #ccc',
+                              ...provided.draggableProps.style
+                            }}
+                          >
+                            <strong>{card.title}</strong>
+                            {card.description && <p style={{ margin: '0.5rem 0 0' }}>{card.description}</p>}
+                          </div>
+                        )}
+                      </Draggable>
+                    ))}
+                  {provided.placeholder}
                 </div>
-              ))}
-          </div>
-        ))}
-      </div>
-
-      {showModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center'
-        }}>
-          <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', minWidth: '300px' }}>
-            <h2>New Card</h2>
-            <select
-              value={newCard.column}
-              onChange={e => setNewCard({ ...newCard, column: e.target.value })}
-            >
-              <option value="" disabled>Select Column</option>
-              {board.columns.map(c => (
-                <option key={c.name} value={c.name}>{c.name}</option>
-              ))}
-            </select>
-            <br /><br />
-            <input
-              placeholder="Title"
-              value={newCard.title}
-              onChange={e => setNewCard({ ...newCard, title: e.target.value })}
-              style={{ width: '100%' }}
-            />
-            <br /><br />
-            <textarea
-              placeholder="Description"
-              value={newCard.description}
-              onChange={e => setNewCard({ ...newCard, description: e.target.value })}
-              style={{ width: '100%' }}
-            />
-            <br /><br />
-            <button onClick={handleAddCard}>Add</button>
-            <button onClick={() => setShowModal(false)} style={{ marginLeft: '1rem' }}>Cancel</button>
-          </div>
+              )}
+            </Droppable>
+          ))}
         </div>
-      )}
+      </DragDropContext>
     </div>
   );
 }
