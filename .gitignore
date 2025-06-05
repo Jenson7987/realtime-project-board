@@ -1,0 +1,17 @@
+# Node.js
+node_modules/
+
+# React
+client/build/
+client/node_modules/
+
+# Environment variables
+.env
+server/.env
+client/.env
+
+# Logs
+*.log
+
+# Mac system files
+.DS_Store
