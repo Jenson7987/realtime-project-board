@@ -1,8 +1,9 @@
 const mongoose = require('mongoose');
 
 const ColumnSchema = new mongoose.Schema({
-  name: String,
-  position: Number,
+  _id: { type: mongoose.Schema.Types.ObjectId, required: true, auto: true },
+  name: { type: String, required: true },
+  position: { type: Number, required: true },
 });
 
 const BoardSchema = new mongoose.Schema({
