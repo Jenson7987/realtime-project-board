@@ -5,28 +5,10 @@ import {
   Draggable,
   DropResult
 } from '@hello-pangea/dnd';
-
-interface Card {
-  _id: string;
-  columnId: string;
-  title: string;
-  description?: string;
-  position: number;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-interface Column {
-  _id: string;
-  name: string;
-  position: number;
-}
-
-interface Board {
-  _id: string;
-  title: string;
-  columns: Column[];
-}
+import { io, Socket } from 'socket.io-client';
+import { format } from 'date-fns';
+import type { Card, Column, Board } from './types';
+import { API_BASE_URL } from './config';
 
 interface BoardResponse {
   board: Board;
@@ -49,13 +31,164 @@ function BoardView() {
   const [editedCardDescription, setEditedCardDescription] = useState('');
   const [isDeletingCard, setIsDeletingCard] = useState(false);
   const [isDeletingColumn, setIsDeletingColumn] = useState<string | null>(null);
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/boards/6842134e9f8121a878d81fad')
-      .then(res => res.json())
-      .then(json => setData(json))
-      .catch(console.error);
+    const newSocket = io('http://localhost:3001', {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      withCredentials: true
+    });
+
+    newSocket.on('connect', () => {
+      console.log('Connected to Socket.io server');
+    });
+
+    newSocket.on('connect_error', (error) => {
+      console.error('Socket.io connection error:', error);
+    });
+
+    setSocket(newSocket);
+
+    return () => {
+      newSocket.close();
+    };
   }, []);
+
+  useEffect(() => {
+    // Fetch initial board data
+    const fetchBoardData = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/boards/6842134e9f8121a878d81fad`);
+        const boardData = await response.json();
+        setData(boardData);
+      } catch (error) {
+        console.error('Error fetching board data:', error);
+        setError('Failed to load board data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchBoardData();
+  }, []);
+
+  useEffect(() => {
+    if (socket && data) {
+      // Join the board room
+      socket.emit('joinBoard', data.board._id);
+      console.log('Joined board room:', data.board._id);
+
+      // Listen for real-time updates
+      socket.on('cardUpdated', handleCardUpdate);
+      socket.on('cardCreated', handleCardCreate);
+      socket.on('cardDeleted', handleCardDelete);
+      socket.on('columnUpdated', handleColumnUpdate);
+      socket.on('columnCreated', handleColumnCreate);
+      socket.on('columnDeleted', handleColumnDelete);
+
+      return () => {
+        socket.emit('leaveBoard', data.board._id);
+        console.log('Left board room:', data.board._id);
+        socket.off('cardUpdated');
+        socket.off('cardCreated');
+        socket.off('cardDeleted');
+        socket.off('columnUpdated');
+        socket.off('columnCreated');
+        socket.off('columnDeleted');
+      };
+    }
+  }, [socket, data]);
+
+  // Real-time event handlers
+  const handleCardUpdate = (eventData: { card: Card; boardId: string }) => {
+    if (data && eventData.boardId === data.board._id) {
+      setData(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          cards: prev.cards.map(card => 
+            card._id === eventData.card._id ? eventData.card : card
+          )
+        };
+      });
+    }
+  };
+
+  const handleCardCreate = (eventData: { card: Card; columnId: string; boardId: string }) => {
+    if (data && eventData.boardId === data.board._id) {
+      setData(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          cards: [...prev.cards, eventData.card]
+        };
+      });
+    }
+  };
+
+  const handleCardDelete = (eventData: { cardId: string; columnId: string; boardId: string }) => {
+    if (data && eventData.boardId === data.board._id) {
+      setData(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          cards: prev.cards.filter(card => card._id !== eventData.cardId)
+        };
+      });
+    }
+  };
+
+  const handleColumnUpdate = (eventData: { column: Column; boardId: string }) => {
+    if (data && eventData.boardId === data.board._id) {
+      setData(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          board: {
+            ...prev.board,
+            columns: prev.board.columns.map((col: Column) => 
+              col._id === eventData.column._id ? eventData.column : col
+            )
+          }
+        };
+      });
+    }
+  };
+
+  const handleColumnCreate = (eventData: { column: Column; boardId: string }) => {
+    if (data && eventData.boardId === data.board._id) {
+      setData(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          board: {
+            ...prev.board,
+            columns: [...prev.board.columns, eventData.column]
+          }
+        };
+      });
+    }
+  };
+
+  const handleColumnDelete = (eventData: { columnId: string; boardId: string }) => {
+    if (data && eventData.boardId === data.board._id) {
+      setData(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          board: {
+            ...prev.board,
+            columns: prev.board.columns.filter((col: Column) => col._id !== eventData.columnId)
+          }
+        };
+      });
+    }
+  };
 
   const onDragEnd = (result: DropResult) => {
     const { destination, source, draggableId } = result;
@@ -95,12 +228,27 @@ function BoardView() {
 
     setData({ ...data, cards: newCards });
 
-    affected.forEach(card => {
-      fetch(`/api/cards/${card._id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ columnId: card.columnId, position: card.position }),
-      }).catch(console.error);
+    // Update each affected card and emit socket events
+    affected.forEach(async card => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/cards/${card._id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ columnId: card.columnId, position: card.position }),
+        });
+        
+        if (!response.ok) throw new Error('Failed to update card position');
+        
+        const updatedCard = await response.json();
+        
+        // Emit socket event
+        socket?.emit('cardUpdated', {
+          card: updatedCard,
+          boardId: data.board._id
+        });
+      } catch (error) {
+        console.error('Error updating card position:', error);
+      }
     });
   };
 
@@ -120,30 +268,47 @@ function BoardView() {
 
   const handleAddCard = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!data || !addCardColumnId || !newCardTitle.trim()) return;
+    if (!addCardColumnId || !data) return;
+
     setIsSubmitting(true);
-    const columnCards = data.cards.filter(c => c.columnId === addCardColumnId);
-    const newCard = {
-      boardId: data.board._id,
-      columnId: addCardColumnId,
-      title: newCardTitle.trim(),
-      description: newCardDescription.trim(),
-      position: columnCards.length,
-    };
     try {
-      const res = await fetch('/api/cards', {
+      const columnCards = data.cards.filter(c => c.columnId === addCardColumnId);
+      const maxPosition = Math.max(...columnCards.map(c => c.position), -1);
+      
+      const response = await fetch(`${API_BASE_URL}/cards`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newCard),
+        body: JSON.stringify({
+          title: newCardTitle,
+          description: newCardDescription,
+          columnId: addCardColumnId,
+          position: maxPosition + 1,
+          boardId: data.board._id
+        }),
       });
-      const created = await res.json();
-      setData({
-        ...data,
-        cards: [...data.cards, created],
+
+      if (!response.ok) throw new Error('Failed to create card');
+      
+      const newCard = await response.json();
+      
+      // Emit socket event
+      socket?.emit('cardCreated', {
+        card: newCard,
+        columnId: addCardColumnId,
+        boardId: data.board._id
       });
+
+      setData(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          cards: [...prev.cards, newCard]
+        };
+      });
+      
       closeAddCardModal();
-    } catch (err) {
-      alert('Failed to add card');
+    } catch (error) {
+      console.error('Error creating card:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -161,33 +326,45 @@ function BoardView() {
 
   const handleAddColumn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!data || !newColumnName.trim()) return;
+    if (!data) return;
 
     setIsSubmittingColumn(true);
     try {
-      const newColumn = {
-        name: newColumnName.trim(),
-        position: data.board.columns ? data.board.columns.length : 0,
-      };
-
-      const response = await fetch(`/api/boards/${data.board._id}/columns`, {
+      const maxPosition = Math.max(...data.board.columns.map(c => c.position), -1);
+      
+      const response = await fetch(`${API_BASE_URL}/boards/${data.board._id}/columns`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newColumn),
+        body: JSON.stringify({
+          name: newColumnName,
+          position: maxPosition + 1
+        }),
       });
 
-      if (!response.ok) throw new Error('Failed to add column');
-
-      const updatedBoard = await response.json();
-      setData({
-        ...data,
-        board: updatedBoard,
+      if (!response.ok) throw new Error('Failed to create column');
+      
+      const newColumn = await response.json();
+      
+      // Emit socket event
+      socket?.emit('columnCreated', {
+        column: newColumn,
+        boardId: data.board._id
       });
-      setNewColumnName('');
+
+      setData(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          board: {
+            ...prev.board,
+            columns: [...prev.board.columns, newColumn]
+          }
+        };
+      });
+      
       closeAddColumnModal();
     } catch (error) {
-      console.error('Error adding column:', error);
-      alert('Failed to add column. Please try again.');
+      console.error('Error creating column:', error);
     } finally {
       setIsSubmittingColumn(false);
     }
@@ -206,101 +383,106 @@ function BoardView() {
 
   const handleEditCard = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedCard || !editedCardTitle.trim()) return;
+    if (!selectedCard || !data) return;
 
-    setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/cards/${selectedCard._id}`, {
+      const response = await fetch(`${API_BASE_URL}/cards/${selectedCard._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: editedCardTitle.trim(),
-          description: editedCardDescription.trim(),
+          title: editedCardTitle,
+          description: editedCardDescription
         }),
       });
 
       if (!response.ok) throw new Error('Failed to update card');
-
+      
       const updatedCard = await response.json();
+      
+      // Emit socket event
+      socket?.emit('cardUpdated', {
+        card: updatedCard,
+        boardId: data.board._id
+      });
+
       setData(prev => {
         if (!prev) return null;
         return {
           ...prev,
           cards: prev.cards.map(card => 
-            card._id === updatedCard._id ? updatedCard : card
-          ),
+            card._id === selectedCard._id ? updatedCard : card
+          )
         };
       });
+      
       closeCardModal();
     } catch (error) {
       console.error('Error updating card:', error);
-      alert('Failed to update card. Please try again.');
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
   const handleDeleteCard = async () => {
-    if (!selectedCard) return;
-    
-    if (!window.confirm('Are you sure you want to delete this card?')) return;
-    
-    setIsDeletingCard(true);
+    if (!selectedCard || !data) return;
+
     try {
-      const response = await fetch(`/api/cards/${selectedCard._id}`, {
+      const response = await fetch(`${API_BASE_URL}/cards/${selectedCard._id}`, {
         method: 'DELETE',
       });
 
       if (!response.ok) throw new Error('Failed to delete card');
+      
+      // Emit socket event
+      socket?.emit('cardDeleted', {
+        cardId: selectedCard._id,
+        columnId: selectedCard.columnId,
+        boardId: data.board._id
+      });
 
       setData(prev => {
         if (!prev) return null;
         return {
           ...prev,
-          cards: prev.cards.filter(card => card._id !== selectedCard._id),
+          cards: prev.cards.filter(card => card._id !== selectedCard._id)
         };
       });
+      
       closeCardModal();
     } catch (error) {
       console.error('Error deleting card:', error);
-      alert('Failed to delete card. Please try again.');
-    } finally {
-      setIsDeletingCard(false);
     }
   };
 
   const handleDeleteColumn = async (columnId: string) => {
     if (!data) return;
-    
-    const columnCards = data.cards.filter(card => card.columnId === columnId);
-    if (columnCards.length > 0) {
-      alert('Cannot delete column: Please remove all cards from this column first.');
-      return;
-    }
-    
-    if (!window.confirm('Are you sure you want to delete this column?')) return;
-    
-    setIsDeletingColumn(columnId);
+
     try {
-      const response = await fetch(`/api/boards/${data.board._id}/columns/${columnId}`, {
+      const response = await fetch(`${API_BASE_URL}/boards/${data.board._id}/columns/${columnId}`, {
         method: 'DELETE',
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to delete column');
-      }
-
-      const updatedBoard = await response.json();
-      setData({
-        ...data,
-        board: updatedBoard,
+      if (!response.ok) throw new Error('Failed to delete column');
+      
+      // Emit socket event
+      socket?.emit('columnDeleted', {
+        columnId,
+        boardId: data.board._id
       });
+
+      setData(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          board: {
+            ...prev.board,
+            columns: prev.board.columns.filter(col => col._id !== columnId)
+          },
+          cards: prev.cards.filter(card => card.columnId !== columnId)
+        };
+      });
+      
+      setIsDeletingColumn(null);
     } catch (error) {
       console.error('Error deleting column:', error);
-      alert(error instanceof Error ? error.message : 'Failed to delete column. Please try again.');
-    } finally {
-      setIsDeletingColumn(null);
     }
   };
 
