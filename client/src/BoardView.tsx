@@ -486,10 +486,16 @@ const BoardView: React.FC = () => {
   const handleDeleteColumn = async (columnId: string) => {
     if (!board) return;
 
+    const columnCards = board.cards.filter(c => c.columnId === columnId);
+    if (columnCards.length > 0) {
+      alert('Move or delete cards before removing the column.');
+      return;
+    }
+
     try {
       const response = await fetch(`${API_BASE_URL}/boards/${board._id}/columns/${columnId}`, {
         method: 'DELETE',
-        headers: { 
+        headers: {
           'Authorization': `Bearer ${token}`
         },
       });
@@ -578,8 +584,8 @@ const BoardView: React.FC = () => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                           <h2 style={{ margin: 0 }}>{col.title}</h2>
                           <button
-                            onClick={() => handleDeleteColumn(col._id)}
-                            disabled={isDeletingColumn === col._id}
+                            onClick={() => isEmpty && handleDeleteColumn(col._id)}
+                            disabled={!isEmpty || isDeletingColumn === col._id}
                             style={{
                               background: 'none',
                               border: 'none',

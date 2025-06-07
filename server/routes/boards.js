@@ -177,6 +177,11 @@ router.delete('/:boardId/columns/:columnId', auth, async (req, res) => {
       return res.status(404).json({ error: 'Board not found or unauthorized' });
     }
 
+    const hasCards = board.cards.some(card => card.columnId.toString() === columnId);
+    if (hasCards) {
+      return res.status(400).json({ error: 'Column is not empty' });
+    }
+    
     // Remove the column
     board.columns = board.columns.filter(col => col._id.toString() !== columnId);
     
