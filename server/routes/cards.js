@@ -78,10 +78,40 @@ router.put('/:boardId/:cardId', auth, async (req, res) => {
       return res.status(404).json({ error: 'Card not found' });
     }
 
+    const oldColumnId = card.columnId.toString();
+    const oldPosition = card.position;
+
     if (title) card.title = title;
     if (description !== undefined) card.description = description;
-    if (position !== undefined) card.position = position;
-    if (columnId) card.columnId = columnId;
+
+    let newColumnId = oldColumnId;
+    let newPosition = oldPosition;
+    if (columnId) newColumnId = columnId;
+    if (position !== undefined) newPosition = position;
+
+    // Adjust positions of cards when column or index changes
+    if (newColumnId !== oldColumnId || newPosition !== oldPosition) {
+      // Remove gap in old column
+      board.cards.forEach(c => {
+        if (c.columnId.toString() === oldColumnId && c.position > oldPosition) {
+          c.position -= 1;
+        }
+      });
+
+      // Create space in new column
+      board.cards.forEach(c => {
+        if (
+          c.columnId.toString() === newColumnId &&
+          c._id.toString() !== cardId &&
+          c.position >= newPosition
+        ) {
+          c.position += 1;
+        }
+      });
+
+      card.columnId = newColumnId;
+      card.position = newPosition;
+    }
 
     await board.save();
 
