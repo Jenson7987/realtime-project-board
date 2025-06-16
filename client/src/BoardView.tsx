@@ -39,7 +39,8 @@ const BoardView: React.FC = () => {
   const [editedCardDescription, setEditedCardDescription] = useState('');
   const [isDeletingCard, setIsDeletingCard] = useState(false);
   const [isDeletingColumn, setIsDeletingColumn] = useState<string | null>(null);
-
+  const [cardError, setCardError] = useState<string | null>(null);
+  
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/login');
@@ -457,8 +458,8 @@ const BoardView: React.FC = () => {
 
   const handleDeleteCard = async () => {
     if (!selectedCard || !board) return;
-
     setIsDeletingCard(true);
+    setCardError(null);
 
     try {
       const response = await fetch(
@@ -471,7 +472,11 @@ const BoardView: React.FC = () => {
         }
       );
 
-      if (!response.ok) throw new Error('Failed to delete card');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        const message = errorData?.error || 'Failed to delete card';
+        throw new Error(message);
+      }
       
       // Emit socket event
       socket?.emit('cardDeleted', {
@@ -491,6 +496,11 @@ const BoardView: React.FC = () => {
       closeCardModal();
     } catch (error) {
       console.error('Error deleting card:', error);
+      if (error instanceof Error) {
+        setCardError(error.message);
+      } else {
+        setCardError('Failed to delete card');
+      }
     } finally {
       setIsDeletingCard(false);
     }
@@ -869,35 +879,42 @@ const BoardView: React.FC = () => {
                     {isSubmitting ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
+                {cardError && (
+                  <p style={{ color: '#dc3545' }}>{cardError}</p>
+                )}
               </form>
             ) : (
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
                   <h2 style={{ margin: 0 }}>{selectedCard.title}</h2>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button
-                      onClick={() => setIsEditingCard(true)}
-                      style={{ background: '#eee', border: 'none', borderRadius: '4px', padding: '0.5rem', cursor: 'pointer' }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={handleDeleteCard}
-                      disabled={isDeletingCard}
-                      style={{
-                        background: '#dc3545', 
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '4px',
-                        padding: '0.5rem',
-                        cursor: 'pointer',
-                        opacity: isDeletingCard ? 0.7 : 1
-                      }}
-                    >
-                      {isDeletingCard ? 'Deleting...' : 'Delete'}
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => setIsEditingCard(true)}
+                    style={{ background: '#eee', border: 'none', borderRadius: '4px', padding: '0.5rem', cursor: 'pointer' }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteCard}
+                    disabled={isDeletingCard}
+                    style={{
+                      background: '#dc3545',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '0.5rem',
+                      cursor: 'pointer',
+                      opacity: isDeletingCard ? 0.7 : 1
+                    }}
+                  >
+                    {isDeletingCard ? 'Deleting...' : 'Delete'}
+                  </button>
                 </div>
+                {cardError && (
+                  <p style={{ color: '#dc3545', marginTop: '0.5rem' }}>{cardError}</p>
+                )}
+              </div>
                 {selectedCard.description && (
                   <p style={{ margin: '1rem 0', whiteSpace: 'pre-wrap' }}>{selectedCard.description}</p>
                 )}

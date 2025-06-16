@@ -150,7 +150,7 @@ router.delete('/:boardId/:cardId', auth, async (req, res) => {
       return res.status(404).json({ error: 'Card not found' });
     }
 
-    card.remove();
+    await card.deleteOne();
     await board.save();
 
     // Emit socket event for real-time updates
