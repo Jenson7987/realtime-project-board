@@ -21,7 +21,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(sessionStorage.getItem('token'));
+  const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -39,13 +39,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(userData);
         } else {
           // If token is invalid, clear everything
-          sessionStorage.removeItem('token');
+          localStorage.removeItem('token');
           setToken(null);
           setUser(null);
         }
       } catch (error) {
         console.error('Error fetching user:', error);
-        sessionStorage.removeItem('token');
+        localStorage.removeItem('token');
         setToken(null);
         setUser(null);
       }
@@ -74,7 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       console.log('Setting token and user data');
-      sessionStorage.setItem('token', data.token);
+      localStorage.setItem('token', data.token);
       setToken(data.token);
       setUser(data.user);
       console.log('Login successful');
@@ -99,13 +99,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const data = await response.json();
-    sessionStorage.setItem('token', data.token);
+    localStorage.setItem('token', data.token);
     setToken(data.token);
     setUser(data.user);
   };
 
   const logout = () => {
-    sessionStorage.removeItem('token');
+    localStorage.removeItem('token');
     setToken(null);
     setUser(null);
   };
