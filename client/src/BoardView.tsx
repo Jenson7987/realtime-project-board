@@ -409,19 +409,23 @@ const BoardView: React.FC = () => {
   const handleEditCard = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCard || !board) return;
+    setIsSubmitting(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/cards/${selectedCard._id}`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          title: editedCardTitle,
-          description: editedCardDescription
-        }),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/cards/${board._id}/${selectedCard._id}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            title: editedCardTitle,
+            description: editedCardDescription
+          })
+        }
+      );
 
       if (!response.ok) throw new Error('Failed to update card');
       
@@ -446,19 +450,26 @@ const BoardView: React.FC = () => {
       closeCardModal();
     } catch (error) {
       console.error('Error updating card:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleDeleteCard = async () => {
     if (!selectedCard || !board) return;
 
+    setIsDeletingCard(true);
+
     try {
-      const response = await fetch(`${API_BASE_URL}/cards/${selectedCard._id}`, {
-        method: 'DELETE',
-        headers: { 
-          'Authorization': `Bearer ${token}`
-        },
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/cards/${board._id}/${selectedCard._id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
 
       if (!response.ok) throw new Error('Failed to delete card');
       
@@ -480,6 +491,8 @@ const BoardView: React.FC = () => {
       closeCardModal();
     } catch (error) {
       console.error('Error deleting card:', error);
+    } finally {
+      setIsDeletingCard(false);
     }
   };
 
