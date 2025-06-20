@@ -7,7 +7,17 @@ import Login from './components/Login';
 import Register from './components/Register';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+  
+  // Show loading while authentication is being checked
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-xl">Loading...</div>
+      </div>
+    );
+  }
+  
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
