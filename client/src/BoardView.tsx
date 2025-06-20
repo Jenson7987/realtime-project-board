@@ -400,11 +400,13 @@ const BoardView: React.FC = () => {
     setSelectedCard(card);
     setEditedCardTitle(card.title);
     setEditedCardDescription(card.description || '');
+    setCardError(null);
   };
 
   const closeCardModal = () => {
     setSelectedCard(null);
     setIsEditingCard(false);
+    setCardError(null);
   };
 
   const handleEditCard = async (e: React.FormEvent) => {
@@ -911,11 +913,11 @@ const BoardView: React.FC = () => {
                     {isDeletingCard ? 'Deleting...' : 'Delete'}
                   </button>
                 </div>
-                {cardError && (
-                  <p style={{ color: '#dc3545', marginTop: '0.5rem' }}>{cardError}</p>
-                )}
               </div>
-                {selectedCard.description && (
+              {cardError && (
+                <p style={{ color: '#dc3545', marginTop: '0.5rem' }}>{cardError}</p>
+              )}
+              {selectedCard.description && (
                   <p style={{ margin: '1rem 0', whiteSpace: 'pre-wrap' }}>{selectedCard.description}</p>
                 )}
                 <div style={{ marginTop: '1rem', color: '#666', fontSize: '0.9rem' }}>
