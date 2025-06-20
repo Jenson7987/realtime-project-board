@@ -5,8 +5,6 @@ import {
   Draggable,
   DropResult
 } from '@hello-pangea/dnd';
-import { io, Socket } from 'socket.io-client';
-import { format } from 'date-fns';
 import type { Card, Column, Board } from '../types';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../contexts/AuthContext';
