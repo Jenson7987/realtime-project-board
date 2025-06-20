@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   DragDropContext,
   Droppable,
@@ -12,12 +12,12 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useSocket } from './hooks/useSocket';
 
 const BoardView: React.FC = () => {
-  const { token, isAuthenticated } = useAuth();
+  const { token, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const { username, slug } = useParams<{ username: string; slug: string }>();
   const socket = useSocket();
   const [board, setBoard] = useState<Board | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [boardLoading, setBoardLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddCardModal, setShowAddCardModal] = useState(false);
   const [addCardColumnId, setAddCardColumnId] = useState<string | null>(null);
@@ -34,8 +34,15 @@ const BoardView: React.FC = () => {
   const [isDeletingCard, setIsDeletingCard] = useState(false);
   const [isDeletingColumn, setIsDeletingColumn] = useState<string | null>(null);
   const [cardError, setCardError] = useState<string | null>(null);
+  const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
+  const [editingColumnTitle, setEditingColumnTitle] = useState('');
+  const [isUpdatingColumn, setIsUpdatingColumn] = useState(false);
+  const editRef = useRef<HTMLInputElement>(null);
   
   useEffect(() => {
+    // Wait for authentication to finish loading
+    if (isLoading) return;
+    
     if (!isAuthenticated) {
       navigate('/login');
       return;
@@ -78,12 +85,12 @@ const BoardView: React.FC = () => {
         console.error('Error fetching board:', err);
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
-        setIsLoading(false);
+        setBoardLoading(false);
       }
     };
 
     fetchBoard();
-  }, [token, navigate, isAuthenticated, username, slug]);
+  }, [token, navigate, isAuthenticated, isLoading, username, slug]);
 
   useEffect(() => {
     if (!socket || !board) return;
@@ -120,13 +127,13 @@ const BoardView: React.FC = () => {
       });
     };
 
-    const handleColumnUpdate = (updatedColumn: Column) => {
+    const handleColumnUpdate = (data: { columnId: string; title: string }) => {
       setBoard(prev => {
         if (!prev) return null;
         return {
           ...prev,
           columns: prev.columns.map((col: Column) => 
-            col._id === updatedColumn._id ? updatedColumn : col
+            col._id === data.columnId ? { ...col, title: data.title } : col
           )
         };
       });
@@ -188,20 +195,17 @@ const BoardView: React.FC = () => {
 
     if (!sourceColumn || !destColumn || !card) return;
 
-    const newCards = [...board.cards];
-
-    // Update card's columnId and position
-    const updatedCard = {
-      ...card,
-      columnId: destination.droppableId,
-      position: destination.index
-    };
-
-    // Update the card in the array
-    const cardIndex = newCards.findIndex(c => c._id === draggableId);
-    if (cardIndex !== -1) {
-      newCards[cardIndex] = updatedCard;
-    }
+    // Create a new cards array with the updated card
+    const newCards = board.cards.map(c => {
+      if (c._id === draggableId) {
+        return {
+          ...c,
+          columnId: destination.droppableId,
+          position: destination.index
+        };
+      }
+      return c;
+    });
 
     // Update positions of other cards in the source column
     newCards.forEach(c => {
@@ -217,11 +221,11 @@ const BoardView: React.FC = () => {
       }
     });
 
-    // Update the board state
-    setBoard({
-      ...board,
+    // Update the board state immediately for smooth visual transition
+    setBoard(prev => ({
+      ...prev!,
       cards: newCards
-    });
+    }));
 
     // Save the changes to the server
     try {
@@ -254,10 +258,10 @@ const BoardView: React.FC = () => {
     } catch (error) {
       console.error('Error updating card position:', error);
       // Revert the board state if the update fails
-      setBoard({
-        ...board,
+      setBoard(prev => ({
+        ...prev!,
         cards: board.cards
-      });
+      }));
     }
   };
 
@@ -527,6 +531,80 @@ const BoardView: React.FC = () => {
     }
   };
 
+  const startEditingColumn = (columnId: string, currentTitle: string) => {
+    setEditingColumnId(columnId);
+    setEditingColumnTitle(currentTitle);
+  };
+
+  const cancelEditingColumn = () => {
+    setEditingColumnId(null);
+    setEditingColumnTitle('');
+  };
+
+  const handleUpdateColumnTitle = async (newTitle: string) => {
+    if (!editingColumnId || !board || !newTitle.trim()) return;
+
+    setIsUpdatingColumn(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/boards/${board._id}/columns/${editingColumnId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: newTitle.trim()
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to update column title');
+
+      // Emit socket event
+      socket?.emit('columnUpdated', {
+        columnId: editingColumnId,
+        title: newTitle.trim(),
+        boardId: board._id
+      });
+
+      // Update the board state with the new title
+      setBoard(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          columns: prev.columns.map(col => 
+            col._id === editingColumnId ? { ...col, title: newTitle.trim() } : col
+          )
+        };
+      });
+
+      // Exit edit mode
+      setEditingColumnId(null);
+      setIsUpdatingColumn(false);
+    } catch (error) {
+      console.error('Error updating column title:', error);
+      // Revert the optimistic update on error
+      setBoard(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          columns: prev.columns.map(col => 
+            col._id === editingColumnId ? { ...col, title: editingColumnTitle } : col
+          )
+        };
+      });
+      setEditingColumnId(null);
+      setIsUpdatingColumn(false);
+    }
+  };
+
+  // Focus the edit field when it becomes active
+  useEffect(() => {
+    if (editingColumnId && editRef.current) {
+      editRef.current.focus();
+      editRef.current.setSelectionRange(editRef.current.value.length, editRef.current.value.length);
+    }
+  }, [editingColumnId]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -624,7 +702,82 @@ const BoardView: React.FC = () => {
                           }}
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                            <h2 style={{ margin: 0 }}>{col.title}</h2>
+                            <div 
+                              style={{ 
+                                flex: 1,
+                                marginRight: '0.5rem',
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '4px',
+                                transition: 'background-color 0.2s',
+                                cursor: editingColumnId === col._id ? 'text' : 'pointer',
+                                fontSize: '1.125rem',
+                                fontWeight: '600',
+                                fontFamily: 'inherit',
+                                display: 'flex',
+                                alignItems: 'center',
+                                minHeight: '1.5rem',
+                                border: editingColumnId === col._id ? '2px solid #3b82f6' : '2px solid transparent',
+                                backgroundColor: editingColumnId === col._id ? '#fff' : 'transparent',
+                                outline: 'none'
+                              }}
+                              onMouseEnter={(e) => {
+                                if (editingColumnId !== col._id) {
+                                  e.currentTarget.style.backgroundColor = '#f3f4f6';
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (editingColumnId !== col._id) {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }
+                              }}
+                              onClick={() => {
+                                if (editingColumnId !== col._id) {
+                                  startEditingColumn(col._id, col.title || '');
+                                }
+                              }}
+                              title={editingColumnId === col._id ? "Editing..." : "Click to edit column title"}
+                            >
+                              {editingColumnId === col._id ? (
+                                <input
+                                  type="text"
+                                  ref={editRef}
+                                  value={editingColumnTitle}
+                                  onChange={(e) => setEditingColumnTitle(e.target.value)}
+                                  onBlur={() => {
+                                    const newTitle = editingColumnTitle.trim();
+                                    if (newTitle && newTitle !== (col.title || '')) {
+                                      handleUpdateColumnTitle(newTitle);
+                                    } else {
+                                      cancelEditingColumn();
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      const newTitle = editingColumnTitle.trim();
+                                      if (newTitle) {
+                                        handleUpdateColumnTitle(newTitle);
+                                      }
+                                    } else if (e.key === 'Escape') {
+                                      cancelEditingColumn();
+                                    }
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    outline: 'none',
+                                    border: 'none',
+                                    background: 'transparent',
+                                    fontSize: 'inherit',
+                                    fontWeight: 'inherit',
+                                    fontFamily: 'inherit',
+                                    margin: 0,
+                                    padding: 0
+                                  }}
+                                />
+                              ) : (
+                                col.title || 'Untitled Column'
+                              )}
+                            </div>
                             <button
                               onClick={() => isEmpty && handleDeleteColumn(col._id)}
                               disabled={!isEmpty || isDeletingColumn === col._id}
@@ -658,49 +811,64 @@ const BoardView: React.FC = () => {
                               </svg>
                             </button>
                           </div>
-                          {columnCards
-                            .sort((a, b) => a.position - b.position)
-                            .map((card, index) => (
-                              <Draggable draggableId={card._id} index={index} key={card._id}>
-                                {(provided, snapshot) => (
-                                  <div
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    {...provided.dragHandleProps}
-                                    onClick={() => handleCardClick(card)}
-                                    style={{
-                                      userSelect: 'none',
-                                      padding: '0.75rem',
-                                      marginBottom: '0.5rem',
-                                      borderRadius: '4px',
-                                      background: snapshot.isDragging ? '#fff' : '#ffffff',
-                                      boxShadow: snapshot.isDragging ? '0 2px 8px rgba(0,0,0,0.2)' : 'none',
-                                      border: '1px solid #ccc',
-                                      cursor: 'pointer',
-                                      ...provided.draggableProps.style
-                                    }}
-                                  >
-                                    <strong>{card.title}</strong>
-                                    {card.description && <p style={{ margin: '0.5rem 0 0' }}>{card.description}</p>}
-                                  </div>
-                                )}
-                              </Draggable>
-                            ))}
-                          {provided.placeholder}
-                          <button
-                            style={{
-                              marginTop: 'auto',
-                              background: '#e0e0e0',
-                              border: 'none',
-                              borderRadius: '4px',
-                              padding: '0.5rem',
-                              cursor: 'pointer',
-                              fontWeight: 600,
-                            }}
-                            onClick={() => openAddCardModal(col._id)}
-                          >
-                            + Add Card
-                          </button>
+                          
+                          <div style={{ minHeight: '200px' }}>
+                            {columnCards
+                              .sort((a, b) => a.position - b.position)
+                              .map((card, index) => (
+                                <Draggable draggableId={card._id} index={index} key={card._id}>
+                                  {(provided, snapshot) => (
+                                    <div
+                                      ref={provided.innerRef}
+                                      {...provided.draggableProps}
+                                      {...provided.dragHandleProps}
+                                      onClick={() => handleCardClick(card)}
+                                      style={{
+                                        userSelect: 'none',
+                                        padding: '0.75rem',
+                                        marginBottom: '0.5rem',
+                                        borderRadius: '4px',
+                                        background: snapshot.isDragging ? '#fff' : '#ffffff',
+                                        boxShadow: snapshot.isDragging ? '0 2px 8px rgba(0,0,0,0.2)' : 'none',
+                                        border: '1px solid #ccc',
+                                        cursor: 'pointer',
+                                        ...provided.draggableProps.style
+                                      }}
+                                    >
+                                      <strong>{card.title}</strong>
+                                      {card.description && <p style={{ margin: '0.5rem 0 0' }}>{card.description}</p>}
+                                    </div>
+                                  )}
+                                </Draggable>
+                              ))}
+                            {isEmpty && (
+                              <div style={{
+                                height: '60px',
+                                marginBottom: '0.5rem',
+                                opacity: 0
+                              }}>
+                                {provided.placeholder}
+                              </div>
+                            )}
+                            {!isEmpty && provided.placeholder}
+                          </div>
+                          
+                          <div style={{ marginTop: 'auto', paddingTop: '1rem' }}>
+                            <button
+                              style={{
+                                width: '100%',
+                                background: '#e0e0e0',
+                                border: 'none',
+                                borderRadius: '4px',
+                                padding: '0.5rem',
+                                cursor: 'pointer',
+                                fontWeight: 600,
+                              }}
+                              onClick={() => openAddCardModal(col._id)}
+                            >
+                              + Add Card
+                            </button>
+                          </div>
                         </div>
                       )}
                     </Droppable>

@@ -1,6 +1,7 @@
 const socketIO = require('socket.io');
 const jwt = require('jsonwebtoken');
 const User = require('./models/User');
+const Board = require('./models/Board');
 
 function initializeSocket(server) {
   const io = socketIO(server, {
@@ -73,6 +74,28 @@ function initializeSocket(server) {
         sourceIndex,
         destinationIndex
       });
+    });
+
+    // Handle column updates
+    socket.on('columnUpdated', async (data) => {
+      try {
+        const board = await Board.findOne({
+          _id: data.boardId,
+          $or: [
+            { owner: socket.user._id },
+            { sharedWith: socket.user._id }
+          ]
+        });
+
+        if (!board) {
+          return socket.emit('error', 'Access denied');
+        }
+
+        socket.to(data.boardId).emit('columnUpdated', data);
+      } catch (error) {
+        console.error('Error updating column:', error);
+        socket.emit('error', 'Failed to update column');
+      }
     });
 
     socket.on('disconnect', () => {

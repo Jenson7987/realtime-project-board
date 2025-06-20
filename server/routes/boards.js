@@ -353,4 +353,42 @@ router.delete('/:boardId/columns/:columnId', auth, async (req, res) => {
   }
 });
 
+// PUT /api/boards/:boardId/columns/:columnId - Update column title
+router.put('/:boardId/columns/:columnId', auth, async (req, res) => {
+  try {
+    const { boardId, columnId } = req.params;
+    const { title } = req.body;
+
+    const board = await Board.findOne({
+      _id: boardId,
+      owner: req.user._id
+    });
+
+    if (!board) {
+      return res.status(404).json({ error: 'Board not found or unauthorized' });
+    }
+
+    // Find and update the specific column
+    const columnIndex = board.columns.findIndex(col => col._id.toString() === columnId);
+    if (columnIndex === -1) {
+      return res.status(404).json({ error: 'Column not found' });
+    }
+
+    board.columns[columnIndex].title = title;
+    const updatedBoard = await board.save();
+
+    // Emit socket event for real-time updates
+    req.app.get('io').to(boardId).emit('columnUpdated', {
+      boardId,
+      columnId,
+      title
+    });
+
+    res.json({ column: board.columns[columnIndex], board: updatedBoard });
+  } catch (err) {
+    console.error('Error updating column:', err);
+    res.status(400).json({ error: 'Failed to update column' });
+  }
+});
+
 module.exports = router;
