@@ -3,6 +3,7 @@ import { API_BASE_URL } from '../config';
 
 interface User {
   id: string;
+  username: string;
   email: string;
   firstName: string;
   lastName: string;
@@ -11,8 +12,8 @@ interface User {
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
+  register: (username: string, email: string, password: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
 }
@@ -54,15 +55,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fetchUser();
   }, [token]);
 
-  const login = async (email: string, password: string) => {
-    console.log('Login attempt started:', { email });
+  const login = async (username: string, password: string) => {
+    console.log('Login attempt started:', { username });
     try {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ username, password })
       });
 
       console.log('Login response status:', response.status);
@@ -84,13 +85,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const register = async (email: string, password: string, firstName: string, lastName: string) => {
+  const register = async (username: string, email: string, password: string, firstName: string, lastName: string) => {
     const response = await fetch(`${API_BASE_URL}/auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ email, password, firstName, lastName })
+      body: JSON.stringify({ username, email, password, firstName, lastName })
     });
 
     if (!response.ok) {

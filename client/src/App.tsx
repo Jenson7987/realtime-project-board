@@ -2,25 +2,18 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import BoardView from './BoardView';
+import Home from './components/Home';
 import Login from './components/Login';
 import Register from './components/Register';
-import Header from './components/Header';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
-  return isAuthenticated ? (
-    <>
-      <Header />
-      {children}
-    </>
-  ) : (
-    <Navigate to="/login" replace />
-  );
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
-  return !isAuthenticated ? <>{children}</> : <Navigate to="/" replace />;
+  return isAuthenticated ? <Navigate to="/" replace /> : <>{children}</>;
 }
 
 function App() {
@@ -45,10 +38,18 @@ function App() {
             }
           />
           <Route
-            path="/"
+            path="/:username/:slug"
             element={
               <PrivateRoute>
                 <BoardView />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/"
+            element={
+              <PrivateRoute>
+                <Home />
               </PrivateRoute>
             }
           />

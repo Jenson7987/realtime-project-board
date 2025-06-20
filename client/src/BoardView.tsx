@@ -8,12 +8,13 @@ import {
 import type { Card, Column, Board } from './types';
 import { API_BASE_URL } from './config';
 import { useAuth } from './contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useSocket } from './hooks/useSocket';
 
 const BoardView: React.FC = () => {
   const { token, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const { username, slug } = useParams<{ username: string; slug: string }>();
   const socket = useSocket();
   const [board, setBoard] = useState<Board | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -40,64 +41,49 @@ const BoardView: React.FC = () => {
       return;
     }
 
-    const fetchBoards = async () => {
-      console.log('Fetching boards...');
+    const fetchBoard = async () => {
+      console.log('Fetching board with username/slug:', { username, slug });
       try {
-        const response = await fetch(`${API_BASE_URL}/boards`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+        let response;
+        
+        if (username && slug) {
+          // Fetch specific board by username and slug
+          response = await fetch(`${API_BASE_URL}/boards/${username}/${slug}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+        } else {
+          // Fallback: redirect to home
+          navigate('/');
+          return;
+        }
 
         console.log('Response status:', response.status);
         if (!response.ok) {
-          throw new Error('Failed to fetch boards');
+          if (response.status === 404) {
+            navigate('/');
+            return;
+          }
+          throw new Error('Failed to fetch board');
         }
 
         const data = await response.json();
         console.log('Received data:', data);
 
-        // If user has no boards, create a default one
-        if (!data.boards || data.boards.length === 0) {
-          console.log('No boards found, creating default board...');
-          const createResponse = await fetch(`${API_BASE_URL}/boards`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              title: 'My First Board',
-              columns: [
-                { title: 'To Do', position: 0 },
-                { title: 'In Progress', position: 1 },
-                { title: 'Done', position: 2 }
-              ]
-            })
-          });
-
-          console.log('Create response status:', createResponse.status);
-          if (!createResponse.ok) {
-            throw new Error('Failed to create default board');
-          }
-
-          const newBoard = await createResponse.json();
-          console.log('Created new board:', newBoard);
-          setBoard(newBoard.board);
-        } else {
-          console.log('Using existing board:', data.boards[0]);
-          setBoard(data.boards[0]); // Use the first board
+        if (data.board) {
+          setBoard(data.board);
         }
       } catch (err) {
-        console.error('Error fetching/creating board:', err);
+        console.error('Error fetching board:', err);
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchBoards();
-  }, [token, navigate, isAuthenticated]);
+    fetchBoard();
+  }, [token, navigate, isAuthenticated, username, slug]);
 
   useEffect(() => {
     if (!socket || !board) return;
@@ -542,15 +528,27 @@ const BoardView: React.FC = () => {
   };
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-xl">Loading...</div>
+      </div>
+    );
   }
 
   if (error) {
-    return <div>Error: {error}</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-xl text-red-500">{error}</div>
+      </div>
+    );
   }
 
   if (!board) {
-    return <div>No board found</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-xl">No board found</div>
+      </div>
+    );
   }
 
   return (
@@ -568,142 +566,169 @@ const BoardView: React.FC = () => {
           <div className="text-xl">No board found</div>
         </div>
       ) : (
-        <div style={{ padding: '2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-            <h1 style={{ margin: 0 }}>{board.title}</h1>
+        <>
+          {/* Header */}
+          <div className="bg-white shadow-sm border-b">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center py-4">
+                <div className="flex items-center space-x-4">
+                  <Link
+                    to="/"
+                    className="text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    ← Back to Boards
+                  </Link>
+                  <div className="h-6 w-px bg-gray-300"></div>
+                  <h1 className="text-2xl font-bold text-gray-900">{board.title}</h1>
+                </div>
+                <div className="flex items-center space-x-4">
+                  <span className="text-sm text-gray-500">@{board.ownerUsername}</span>
+                  <Link
+                    to="/"
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    My Boards
+                  </Link>
+                </div>
+              </div>
+            </div>
           </div>
-          <DragDropContext onDragEnd={onDragEnd}>
-            <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto' }}>
-              {board.columns.map((col) => {
-                const columnCards = board.cards.filter(card => card.columnId === col._id);
-                const isEmpty = columnCards.length === 0;
-                
-                return (
-                  <Droppable droppableId={col._id} key={col._id}>
-                    {(provided, snapshot) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        style={{
-                          width: '275px',
-                          minHeight: '500px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'stretch',
-                          backgroundColor: snapshot.isDraggingOver ? '#f0f0f0' : '#fafafa',
-                          border: '1px solid #ddd',
-                          borderRadius: '8px',
-                          padding: '1rem',
-                          boxSizing: 'border-box',
-                          overflowY: 'auto',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                          <h2 style={{ margin: 0 }}>{col.title}</h2>
-                          <button
-                            onClick={() => isEmpty && handleDeleteColumn(col._id)}
-                            disabled={!isEmpty || isDeletingColumn === col._id}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              padding: '0.25rem',
-                              cursor: isEmpty ? 'pointer' : 'not-allowed',
-                              opacity: isDeletingColumn === col._id ? 0.7 : isEmpty ? 0.7 : 0.3,
-                              transition: 'opacity 0.2s',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                            title={isEmpty ? 'Delete column' : 'Cannot delete: Column contains cards'}
-                          >
-                            <svg
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              style={{ color: '#dc3545' }}
+
+          {/* Board Content */}
+          <div className="p-6">
+            <DragDropContext onDragEnd={onDragEnd}>
+              <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto' }}>
+                {board.columns.map((col) => {
+                  const columnCards = board.cards.filter(card => card.columnId === col._id);
+                  const isEmpty = columnCards.length === 0;
+                  
+                  return (
+                    <Droppable droppableId={col._id} key={col._id}>
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.droppableProps}
+                          style={{
+                            width: '275px',
+                            minHeight: '500px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'stretch',
+                            backgroundColor: snapshot.isDraggingOver ? '#f0f0f0' : '#fafafa',
+                            border: '1px solid #ddd',
+                            borderRadius: '8px',
+                            padding: '1rem',
+                            boxSizing: 'border-box',
+                            overflowY: 'auto',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                            <h2 style={{ margin: 0 }}>{col.title}</h2>
+                            <button
+                              onClick={() => isEmpty && handleDeleteColumn(col._id)}
+                              disabled={!isEmpty || isDeletingColumn === col._id}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: '0.25rem',
+                                cursor: isEmpty ? 'pointer' : 'not-allowed',
+                                opacity: isDeletingColumn === col._id ? 0.7 : isEmpty ? 0.7 : 0.3,
+                                transition: 'opacity 0.2s',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                              title={isEmpty ? 'Delete column' : 'Cannot delete: Column contains cards'}
                             >
-                              <path d="M3 6h18" />
-                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                            </svg>
+                              <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                style={{ color: '#dc3545' }}
+                              >
+                                <path d="M3 6h18" />
+                                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                              </svg>
+                            </button>
+                          </div>
+                          {columnCards
+                            .sort((a, b) => a.position - b.position)
+                            .map((card, index) => (
+                              <Draggable draggableId={card._id} index={index} key={card._id}>
+                                {(provided, snapshot) => (
+                                  <div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                    onClick={() => handleCardClick(card)}
+                                    style={{
+                                      userSelect: 'none',
+                                      padding: '0.75rem',
+                                      marginBottom: '0.5rem',
+                                      borderRadius: '4px',
+                                      background: snapshot.isDragging ? '#fff' : '#ffffff',
+                                      boxShadow: snapshot.isDragging ? '0 2px 8px rgba(0,0,0,0.2)' : 'none',
+                                      border: '1px solid #ccc',
+                                      cursor: 'pointer',
+                                      ...provided.draggableProps.style
+                                    }}
+                                  >
+                                    <strong>{card.title}</strong>
+                                    {card.description && <p style={{ margin: '0.5rem 0 0' }}>{card.description}</p>}
+                                  </div>
+                                )}
+                              </Draggable>
+                            ))}
+                          {provided.placeholder}
+                          <button
+                            style={{
+                              marginTop: 'auto',
+                              background: '#e0e0e0',
+                              border: 'none',
+                              borderRadius: '4px',
+                              padding: '0.5rem',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                            }}
+                            onClick={() => openAddCardModal(col._id)}
+                          >
+                            + Add Card
                           </button>
                         </div>
-                        {columnCards
-                          .sort((a, b) => a.position - b.position)
-                          .map((card, index) => (
-                            <Draggable draggableId={card._id} index={index} key={card._id}>
-                              {(provided, snapshot) => (
-                                <div
-                                  ref={provided.innerRef}
-                                  {...provided.draggableProps}
-                                  {...provided.dragHandleProps}
-                                  onClick={() => handleCardClick(card)}
-                                  style={{
-                                    userSelect: 'none',
-                                    padding: '0.75rem',
-                                    marginBottom: '0.5rem',
-                                    borderRadius: '4px',
-                                    background: snapshot.isDragging ? '#fff' : '#ffffff',
-                                    boxShadow: snapshot.isDragging ? '0 2px 8px rgba(0,0,0,0.2)' : 'none',
-                                    border: '1px solid #ccc',
-                                    cursor: 'pointer',
-                                    ...provided.draggableProps.style
-                                  }}
-                                >
-                                  <strong>{card.title}</strong>
-                                  {card.description && <p style={{ margin: '0.5rem 0 0' }}>{card.description}</p>}
-                                </div>
-                              )}
-                            </Draggable>
-                          ))}
-                        {provided.placeholder}
-                        <button
-                          style={{
-                            marginTop: 'auto',
-                            background: '#e0e0e0',
-                            border: 'none',
-                            borderRadius: '4px',
-                            padding: '0.5rem',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                          }}
-                          onClick={() => openAddCardModal(col._id)}
-                        >
-                          + Add Card
-                        </button>
-                      </div>
-                    )}
-                  </Droppable>
-                );
-              })}
-              <button
-                style={{
-                  width: '275px',
-                  height: '40px',
-                  background: '#e0e0e0',
-                  border: '1px dashed #ccc',
-                  borderRadius: '8px',
-                  padding: '0.5rem',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-                onClick={openAddColumnModal}
-              >
-                + Add Column
-              </button>
-            </div>
-          </DragDropContext>
-        </div>
+                      )}
+                    </Droppable>
+                  );
+                })}
+                <button
+                  style={{
+                    width: '275px',
+                    height: '40px',
+                    background: '#e0e0e0',
+                    border: '1px dashed #ccc',
+                    borderRadius: '8px',
+                    padding: '0.5rem',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                  onClick={openAddColumnModal}
+                >
+                  + Add Column
+                </button>
+              </div>
+            </DragDropContext>
+          </div>
+        </>
       )}
       {showAddCardModal && (
         <div

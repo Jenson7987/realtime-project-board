@@ -13,7 +13,7 @@ router.get('/', auth, async (req, res) => {
         { owner: req.user._id },
         { sharedWith: req.user._id }
       ]
-    }).populate('owner', 'email firstName lastName');
+    }).populate('owner', 'username email firstName lastName');
 
     console.log('Found boards:', JSON.stringify(boards, null, 2));
     res.json({ boards });
@@ -40,9 +40,29 @@ router.post('/', auth, async (req, res) => {
       });
     }
 
+    // Generate slug from title
+    const generateSlug = (title) => {
+      return title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+    };
+
+    const baseSlug = generateSlug(title);
+    let slug = baseSlug;
+    let counter = 1;
+    
+    // Check if slug already exists and make it unique
+    while (await Board.findOne({ ownerUsername: req.user.username, slug })) {
+      slug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+
     const board = new Board({
       title,
+      slug,
       owner: req.user._id,
+      ownerUsername: req.user.username,
       columns: safeColumns || [
         { _id: new mongoose.Types.ObjectId(), title: 'To Do', position: 0 },
         { _id: new mongoose.Types.ObjectId(), title: 'In Progress', position: 1 },
@@ -56,11 +76,62 @@ router.post('/', auth, async (req, res) => {
     res.json({ board: saved });
   } catch (err) {
     console.error('Error creating board:', err);
+    if (err.code === 11000) {
+      return res.status(400).json({ error: 'A board with this name already exists' });
+    }
     res.status(400).json({ error: 'Failed to create board' });
   }
 });
 
-// GET /api/boards/:boardId - Get one board and its cards
+// GET /api/boards/:username/:slug - Get a board by username and slug
+router.get('/:username/:slug', auth, async (req, res) => {
+  try {
+    const { username, slug } = req.params;
+    console.log('Fetching board:', { username, slug });
+
+    const board = await Board.findOne({
+      ownerUsername: username.toLowerCase(),
+      slug: slug,
+      $or: [
+        { owner: req.user._id },
+        { sharedWith: req.user._id }
+      ]
+    }).populate('owner', 'username email firstName lastName');
+
+    if (!board) {
+      return res.status(404).json({ error: 'Board not found' });
+    }
+
+    res.json({ board });
+  } catch (err) {
+    console.error('Error fetching board by username/slug:', err);
+    res.status(404).json({ error: 'Board not found' });
+  }
+});
+
+// GET /api/boards/slug/:slug - Get a board by its slug (legacy route)
+router.get('/slug/:slug', auth, async (req, res) => {
+  try {
+    const board = await Board.findOne({
+      slug: req.params.slug,
+      $or: [
+        { owner: req.user._id },
+        { sharedWith: req.user._id }
+      ]
+    }).populate('owner', 'username email firstName lastName');
+
+    if (!board) {
+      return res.status(404).json({ error: 'Board not found' });
+    }
+
+    res.json({ board });
+  } catch (err) {
+    console.error('Error fetching board by slug:', err);
+    res.status(404).json({ error: 'Board not found' });
+  }
+});
+
+// GET /api/boards/:boardId - Get one board and its cards (legacy route)
 router.get('/:boardId', auth, async (req, res) => {
   try {
     const board = await Board.findOne({
@@ -69,7 +140,7 @@ router.get('/:boardId', auth, async (req, res) => {
         { owner: req.user._id },
         { sharedWith: req.user._id }
       ]
-    }).populate('owner', 'email firstName lastName');
+    }).populate('owner', 'username email firstName lastName');
 
     if (!board) {
       return res.status(404).json({ error: 'Board not found' });
@@ -79,6 +150,85 @@ router.get('/:boardId', auth, async (req, res) => {
   } catch (err) {
     console.error('Error fetching board:', err);
     res.status(404).json({ error: 'Board not found' });
+  }
+});
+
+// POST /api/boards/create-default - Create default board for new user
+router.post('/create-default', auth, async (req, res) => {
+  try {
+    console.log('Creating default board for user:', req.user._id);
+
+    // Check if user already has a "my-first-board"
+    const existingBoard = await Board.findOne({
+      owner: req.user._id,
+      slug: 'my-first-board'
+    });
+
+    if (existingBoard) {
+      return res.json({ board: existingBoard });
+    }
+
+    // Sample cards for the default board
+    const sampleCards = [
+      {
+        _id: new mongoose.Types.ObjectId(),
+        columnId: 'todo',
+        title: 'Welcome to your first board! 🎉',
+        description: 'This is your first card. Click on it to edit or drag it between columns.',
+        position: 0
+      },
+      {
+        _id: new mongoose.Types.ObjectId(),
+        columnId: 'todo',
+        title: 'Create your own cards',
+        description: 'Click the "+" button in any column to add new cards.',
+        position: 1
+      },
+      {
+        _id: new mongoose.Types.ObjectId(),
+        columnId: 'in-progress',
+        title: 'Drag and drop cards',
+        description: 'Try dragging this card to another column to see it in action!',
+        position: 0
+      },
+      {
+        _id: new mongoose.Types.ObjectId(),
+        columnId: 'done',
+        title: 'Collaborate with others',
+        description: 'Share your boards with team members for real-time collaboration.',
+        position: 0
+      }
+    ];
+
+    const todoColumnId = new mongoose.Types.ObjectId();
+    const inProgressColumnId = new mongoose.Types.ObjectId();
+    const doneColumnId = new mongoose.Types.ObjectId();
+
+    // Update card columnIds to use the actual column IDs
+    sampleCards[0].columnId = todoColumnId.toString();
+    sampleCards[1].columnId = todoColumnId.toString();
+    sampleCards[2].columnId = inProgressColumnId.toString();
+    sampleCards[3].columnId = doneColumnId.toString();
+
+    const board = new Board({
+      title: 'My First Board',
+      slug: 'my-first-board',
+      owner: req.user._id,
+      ownerUsername: req.user.username,
+      columns: [
+        { _id: todoColumnId, title: 'To Do', position: 0 },
+        { _id: inProgressColumnId, title: 'In Progress', position: 1 },
+        { _id: doneColumnId, title: 'Done', position: 2 },
+      ],
+      cards: sampleCards,
+    });
+
+    const saved = await board.save();
+    console.log('Created default board:', saved);
+    res.json({ board: saved });
+  } catch (err) {
+    console.error('Error creating default board:', err);
+    res.status(400).json({ error: 'Failed to create default board' });
   }
 });
 

@@ -15,14 +15,20 @@ export interface Column {
   position: number;
 }
 
+export interface User {
+  _id: string;
+  username: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+}
+
 export interface Board {
   _id: string;
   title: string;
-  owner: {
-    _id: string;
-    username: string;
-    email: string;
-  };
+  slug: string;
+  owner: User;
+  ownerUsername: string;
   sharedWith: string[];
   columns: Column[];
   cards: Card[];
