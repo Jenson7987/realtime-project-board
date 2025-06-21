@@ -2,21 +2,35 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const Board = require('../models/Board');
+const User = require('../models/User');
 const auth = require('../middleware/auth');
 
 // GET /api/boards - Get all boards for the authenticated user
 router.get('/', auth, async (req, res) => {
   try {
     console.log('Fetching boards for user:', req.user._id);
+    
+    // Get user's starred boards
+    const user = await User.findById(req.user._id).populate('starredBoards');
+    const starredBoardIds = user.starredBoards.map(board => board._id.toString());
+    
     const boards = await Board.find({
       $or: [
         { owner: req.user._id },
         { sharedWith: req.user._id }
       ]
-    }).populate('owner', 'username email firstName lastName');
+    })
+    .populate('owner', 'username email firstName lastName')
+    .sort({ updatedAt: -1 }); // Sort by last modified, newest first
 
-    console.log('Found boards:', JSON.stringify(boards, null, 2));
-    res.json({ boards });
+    // Add starred status to each board
+    const boardsWithStarredStatus = boards.map(board => ({
+      ...board.toObject(),
+      isStarred: starredBoardIds.includes(board._id.toString())
+    }));
+
+    console.log('Found boards:', JSON.stringify(boardsWithStarredStatus, null, 2));
+    res.json({ boards: boardsWithStarredStatus });
   } catch (err) {
     console.error('Error fetching boards:', err);
     res.status(500).json({ error: 'Failed to fetch boards' });
@@ -26,8 +40,8 @@ router.get('/', auth, async (req, res) => {
 // POST /api/boards - Create a new board
 router.post('/', auth, async (req, res) => {
   try {
-    const { title, columns } = req.body;
-    console.log('Creating board with data:', { title, columns, owner: req.user._id });
+    const { title, columns, sampleCards } = req.body;
+    console.log('Creating board with data:', { title, columns, sampleCards, owner: req.user._id });
 
     // Convert columns with 'name' to 'title' for backward compatibility
     let safeColumns = columns;
@@ -58,6 +72,52 @@ router.post('/', auth, async (req, res) => {
       counter++;
     }
 
+    // Create sample cards if requested
+    let cards = [];
+    if (sampleCards) {
+      const todoColumnId = new mongoose.Types.ObjectId();
+      const inProgressColumnId = new mongoose.Types.ObjectId();
+      const doneColumnId = new mongoose.Types.ObjectId();
+
+      // Update column IDs to use the actual IDs
+      if (safeColumns && safeColumns.length >= 3) {
+        safeColumns[0]._id = todoColumnId;
+        safeColumns[1]._id = inProgressColumnId;
+        safeColumns[2]._id = doneColumnId;
+      }
+
+      cards = [
+        {
+          _id: new mongoose.Types.ObjectId(),
+          columnId: todoColumnId.toString(),
+          title: 'Welcome to your sample board! 🎉',
+          description: 'This is your first card. Click on it to edit or drag it between columns.',
+          position: 0
+        },
+        {
+          _id: new mongoose.Types.ObjectId(),
+          columnId: todoColumnId.toString(),
+          title: 'Create your own cards',
+          description: 'Click the "+" button in any column to add new cards.',
+          position: 1
+        },
+        {
+          _id: new mongoose.Types.ObjectId(),
+          columnId: inProgressColumnId.toString(),
+          title: 'Drag and drop cards',
+          description: 'Try dragging this card to another column to see it in action!',
+          position: 0
+        },
+        {
+          _id: new mongoose.Types.ObjectId(),
+          columnId: doneColumnId.toString(),
+          title: 'Collaborate with others',
+          description: 'Share your boards with team members for real-time collaboration.',
+          position: 0
+        }
+      ];
+    }
+
     const board = new Board({
       title,
       slug,
@@ -68,7 +128,7 @@ router.post('/', auth, async (req, res) => {
         { _id: new mongoose.Types.ObjectId(), title: 'In Progress', position: 1 },
         { _id: new mongoose.Types.ObjectId(), title: 'Done', position: 2 },
       ],
-      cards: [],
+      cards: cards,
     });
 
     const saved = await board.save();
@@ -324,7 +384,7 @@ router.delete('/:boardId/columns/:columnId', auth, async (req, res) => {
     });
 
     if (!board) {
-      return res.status(404).json({ error: 'Board not found or unauthorized' });
+      return res.status(404).json({ error: 'Board not found' });
     }
 
     const hasCards = board.cards.some(card => card.columnId.toString() === columnId);
@@ -388,6 +448,55 @@ router.put('/:boardId/columns/:columnId', auth, async (req, res) => {
   } catch (err) {
     console.error('Error updating column:', err);
     res.status(400).json({ error: 'Failed to update column' });
+  }
+});
+
+// POST /api/boards/:boardId/star - Star a board
+router.post('/:boardId/star', auth, async (req, res) => {
+  try {
+    const { boardId } = req.params;
+    
+    // Check if board exists and user has access
+    const board = await Board.findOne({
+      _id: boardId,
+      $or: [
+        { owner: req.user._id },
+        { sharedWith: req.user._id }
+      ]
+    });
+
+    if (!board) {
+      return res.status(404).json({ error: 'Board not found or unauthorized' });
+    }
+
+    // Add board to user's starred boards
+    await User.findByIdAndUpdate(
+      req.user._id,
+      { $addToSet: { starredBoards: boardId } }
+    );
+
+    res.json({ success: true, message: 'Board starred' });
+  } catch (err) {
+    console.error('Error starring board:', err);
+    res.status(400).json({ error: 'Failed to star board' });
+  }
+});
+
+// DELETE /api/boards/:boardId/star - Unstar a board
+router.delete('/:boardId/star', auth, async (req, res) => {
+  try {
+    const { boardId } = req.params;
+    
+    // Remove board from user's starred boards
+    await User.findByIdAndUpdate(
+      req.user._id,
+      { $pull: { starredBoards: boardId } }
+    );
+
+    res.json({ success: true, message: 'Board unstarred' });
+  } catch (err) {
+    console.error('Error unstarring board:', err);
+    res.status(400).json({ error: 'Failed to unstar board' });
   }
 });
 

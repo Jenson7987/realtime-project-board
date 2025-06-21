@@ -13,10 +13,30 @@ const Home: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newBoardTitle, setNewBoardTitle] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [starringBoard, setStarringBoard] = useState<string | null>(null);
 
   useEffect(() => {
     fetchBoards();
   }, []);
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.user-menu-container')) {
+        setShowUserMenu(false);
+      }
+    };
+
+    if (showUserMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showUserMenu]);
 
   const fetchBoards = async () => {
     if (!token) return;
@@ -43,17 +63,29 @@ const Home: React.FC = () => {
     
     setIsCreating(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/boards/create-default`, {
+      const response = await fetch(`${API_BASE_URL}/boards`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: 'Sample Board',
+          columns: [
+            { title: 'To Do', position: 0 },
+            { title: 'In Progress', position: 1 },
+            { title: 'Done', position: 2 }
+          ],
+          sampleCards: true // Flag to indicate this should include sample cards
+        })
       });
       
-      if (!response.ok) throw new Error('Failed to create default board');
+      if (!response.ok) throw new Error('Failed to create sample board');
       
       const data = await response.json();
       navigate(`/${user?.username}/${data.board.slug}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create default board');
+      setError(err instanceof Error ? err.message : 'Failed to create sample board');
     } finally {
       setIsCreating(false);
     }
@@ -117,6 +149,32 @@ const Home: React.FC = () => {
     navigate('/login');
   };
 
+  const handleStarBoard = async (boardId: string, isStarred: boolean, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    setStarringBoard(boardId);
+    try {
+      const response = await fetch(`${API_BASE_URL}/boards/${boardId}/star`, {
+        method: isStarred ? 'DELETE' : 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to update star status');
+
+      // Update the board's starred status in the local state
+      setBoards(prev => prev.map(board => 
+        board._id === boardId ? { ...board, isStarred: !isStarred } : board
+      ));
+    } catch (err) {
+      console.error('Error updating star status:', err);
+    } finally {
+      setStarringBoard(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
@@ -150,23 +208,44 @@ const Home: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3 bg-white/60 backdrop-blur-sm rounded-full px-4 py-2 border border-gray-200">
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-semibold">
-                    {user?.firstName?.[0]}{user?.lastName?.[0]}
-                  </span>
+              <div className="relative user-menu-container">
+                <div 
+                  className="flex items-center space-x-3 bg-white/60 backdrop-blur-sm rounded-full px-4 py-2 border border-gray-200 cursor-pointer hover:bg-white hover:shadow-md transition-all duration-200"
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                >
+                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm font-semibold">
+                      {user?.firstName?.[0]}{user?.lastName?.[0]}
+                    </span>
+                  </div>
+                  <div className="text-sm">
+                    <p className="font-medium text-gray-900">{user?.firstName} {user?.lastName}</p>
+                    <p className="text-gray-500">@{user?.username}</p>
+                  </div>
+                  <svg 
+                    className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${showUserMenu ? 'rotate-180' : ''}`} 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
                 </div>
-                <div className="text-sm">
-                  <p className="font-medium text-gray-900">{user?.firstName} {user?.lastName}</p>
-                  <p className="text-gray-500">@{user?.username}</p>
-                </div>
+                
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
+                    <button
+                      onClick={handleLogout}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      <span>Sign out</span>
+                    </button>
+                  </div>
+                )}
               </div>
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white/60 backdrop-blur-sm border border-gray-200 rounded-lg hover:bg-white hover:shadow-md transition-all duration-200"
-              >
-                Sign out
-              </button>
             </div>
           </div>
         </div>
@@ -261,72 +340,154 @@ const Home: React.FC = () => {
             </div>
           </div>
 
-          {boards.length === 0 ? (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
-              <div className="w-24 h-24 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          {/* Starred Boards Section */}
+          {boards.filter(board => board.isStarred).length > 0 && (
+            <div className="mb-8">
+              <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <svg className="w-5 h-5 text-yellow-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                 </svg>
-              </div>
-              <h4 className="text-xl font-semibold text-gray-900 mb-2">No boards yet</h4>
-              <p className="text-gray-600 mb-8 max-w-md mx-auto">
-                Create your first board to start organizing your projects and tasks. You can create a custom board or try our sample board to see how it works.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <button
-                  onClick={() => setShowCreateModal(true)}
-                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-xl hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200"
-                >
-                  Create Your First Board
-                </button>
-                <button
-                  onClick={createDefaultBoard}
-                  className="px-6 py-3 bg-white text-gray-700 font-medium rounded-xl border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200"
-                >
-                  Try Sample Board
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {boards.map((board) => (
-                <Link
-                  key={board._id}
-                  to={`/${user?.username}/${board.slug}`}
-                  className="group bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-blue-300 transition-all duration-300 transform hover:scale-[1.02]"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-lg font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
-                        {board.title}
-                      </h4>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Created {new Date(board.createdAt).toLocaleDateString()}
-                      </p>
+                Starred Boards
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {boards.filter(board => board.isStarred).map((board) => (
+                  <Link
+                    key={board._id}
+                    to={`/${user?.username}/${board.slug}`}
+                    className="group bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-blue-300 transition-all duration-300 transform hover:scale-[1.02] relative"
+                  >
+                    <div className="absolute top-4 right-4 z-10">
+                      <button
+                        onClick={(e) => handleStarBoard(board._id, true, e)}
+                        disabled={starringBoard === board._id}
+                        className="text-yellow-500 hover:text-yellow-600 transition-colors disabled:opacity-50"
+                      >
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                      </button>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {board.cards?.length || 0} cards
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center text-sm text-gray-500">
-                      <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mr-2">
-                        <span className="text-white text-xs font-semibold">
-                          {board.ownerUsername[0].toUpperCase()}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-lg font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                          {board.title}
+                        </h4>
+                        <div className="text-sm text-gray-500 mt-1 space-y-1">
+                          <p>Created {new Date(board.createdAt).toLocaleDateString()}</p>
+                          <p>Last modified {new Date(board.updatedAt).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2 mr-8">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {board.cards?.length || 0} cards
                         </span>
                       </div>
-                      @{board.ownerUsername}
                     </div>
-                    <svg className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </Link>
-              ))}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center text-sm text-gray-500">
+                        <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mr-2">
+                          <span className="text-white text-xs font-semibold">
+                            {board.ownerUsername[0].toUpperCase()}
+                          </span>
+                        </div>
+                        @{board.ownerUsername}
+                      </div>
+                      <svg className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  </Link>
+                ))}
+              </div>
             </div>
           )}
+
+          {/* All Boards Section */}
+          <div>
+            <h4 className="text-lg font-semibold text-gray-900 mb-4">All Boards</h4>
+            {boards.length === 0 ? (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
+                <div className="w-24 h-24 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                </div>
+                <h4 className="text-xl font-semibold text-gray-900 mb-2">No boards yet</h4>
+                <p className="text-gray-600 mb-8 max-w-md mx-auto">
+                  Create your first board to start organizing your projects and tasks. You can create a custom board or try our sample board to see how it works.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <button
+                    onClick={() => setShowCreateModal(true)}
+                    className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-xl hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200"
+                  >
+                    Create Your First Board
+                  </button>
+                  <button
+                    onClick={createDefaultBoard}
+                    className="px-6 py-3 bg-white text-gray-700 font-medium rounded-xl border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200"
+                  >
+                    Try Sample Board
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {boards.map((board) => (
+                  <Link
+                    key={board._id}
+                    to={`/${user?.username}/${board.slug}`}
+                    className="group bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-blue-300 transition-all duration-300 transform hover:scale-[1.02] relative"
+                  >
+                    <div className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <button
+                        onClick={(e) => handleStarBoard(board._id, board.isStarred || false, e)}
+                        disabled={starringBoard === board._id}
+                        className={`transition-colors disabled:opacity-50 ${
+                          board.isStarred 
+                            ? 'text-yellow-500 hover:text-yellow-600' 
+                            : 'text-gray-400 hover:text-yellow-500'
+                        }`}
+                      >
+                        <svg className="w-5 h-5" fill={board.isStarred ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 20 20">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                      </button>
+                    </div>
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-lg font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                          {board.title}
+                        </h4>
+                        <div className="text-sm text-gray-500 mt-1 space-y-1">
+                          <p>Created {new Date(board.createdAt).toLocaleDateString()}</p>
+                          <p>Last modified {new Date(board.updatedAt).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2 mr-8">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {board.cards?.length || 0} cards
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center text-sm text-gray-500">
+                        <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mr-2">
+                          <span className="text-white text-xs font-semibold">
+                            {board.ownerUsername[0].toUpperCase()}
+                          </span>
+                        </div>
+                        @{board.ownerUsername}
+                      </div>
+                      <svg className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

@@ -12,7 +12,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useSocket } from './hooks/useSocket';
 
 const BoardView: React.FC = () => {
-  const { token, isAuthenticated, isLoading } = useAuth();
+  const { token, isAuthenticated, isLoading, user, logout } = useAuth();
   const navigate = useNavigate();
   const { username, slug } = useParams<{ username: string; slug: string }>();
   const socket = useSocket();
@@ -37,6 +37,7 @@ const BoardView: React.FC = () => {
   const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
   const [editingColumnTitle, setEditingColumnTitle] = useState('');
   const [isUpdatingColumn, setIsUpdatingColumn] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const editRef = useRef<HTMLInputElement>(null);
   
   useEffect(() => {
@@ -542,59 +543,52 @@ const BoardView: React.FC = () => {
   };
 
   const handleUpdateColumnTitle = async (newTitle: string) => {
-    if (!editingColumnId || !board || !newTitle.trim()) return;
-
+    if (!board || !editingColumnId) return;
+    
     setIsUpdatingColumn(true);
     try {
       const response = await fetch(`${API_BASE_URL}/boards/${board._id}/columns/${editingColumnId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({
-          title: newTitle.trim()
-        }),
+        body: JSON.stringify({ title: newTitle })
       });
 
       if (!response.ok) throw new Error('Failed to update column title');
 
-      // Emit socket event
-      socket?.emit('columnUpdated', {
-        columnId: editingColumnId,
-        title: newTitle.trim(),
-        boardId: board._id
-      });
-
-      // Update the board state with the new title
+      const data = await response.json();
       setBoard(prev => {
         if (!prev) return null;
         return {
           ...prev,
           columns: prev.columns.map(col => 
-            col._id === editingColumnId ? { ...col, title: newTitle.trim() } : col
+            col._id === editingColumnId ? { ...col, title: newTitle } : col
           )
         };
       });
 
-      // Exit edit mode
-      setEditingColumnId(null);
+      // Emit socket event for real-time updates
+      if (socket) {
+        socket.emit('columnUpdated', {
+          boardId: board._id,
+          columnId: editingColumnId,
+          title: newTitle
+        });
+      }
+    } catch (err) {
+      console.error('Error updating column title:', err);
+    } finally {
       setIsUpdatingColumn(false);
-    } catch (error) {
-      console.error('Error updating column title:', error);
-      // Revert the optimistic update on error
-      setBoard(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          columns: prev.columns.map(col => 
-            col._id === editingColumnId ? { ...col, title: editingColumnTitle } : col
-          )
-        };
-      });
       setEditingColumnId(null);
-      setIsUpdatingColumn(false);
+      setEditingColumnTitle('');
     }
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
   };
 
   // Focus the edit field when it becomes active
@@ -604,6 +598,24 @@ const BoardView: React.FC = () => {
       editRef.current.setSelectionRange(editRef.current.value.length, editRef.current.value.length);
     }
   }, [editingColumnId]);
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.user-menu-container')) {
+        setShowUserMenu(false);
+      }
+    };
+
+    if (showUserMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showUserMenu]);
 
   if (isLoading || boardLoading) {
     return (
@@ -630,7 +642,7 @@ const BoardView: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100" style={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       {boardLoading ? (
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-xl">Loading...</div>
@@ -646,7 +658,7 @@ const BoardView: React.FC = () => {
       ) : (
         <>
           {/* Header */}
-          <div className="bg-white shadow-sm border-b">
+          <div className="bg-white shadow-sm border-b" style={{ flexShrink: 0 }}>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex justify-between items-center py-4">
                 <div className="flex items-center space-x-4">
@@ -660,22 +672,53 @@ const BoardView: React.FC = () => {
                   <h1 className="text-2xl font-bold text-gray-900">{board.title}</h1>
                 </div>
                 <div className="flex items-center space-x-4">
-                  <span className="text-sm text-gray-500">@{board.ownerUsername}</span>
-                  <Link
-                    to="/"
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    My Boards
-                  </Link>
+                  <div className="relative user-menu-container">
+                    <div 
+                      className="flex items-center space-x-3 bg-white/60 backdrop-blur-sm rounded-full px-4 py-2 border border-gray-200 cursor-pointer hover:bg-white hover:shadow-md transition-all duration-200"
+                      onClick={() => setShowUserMenu(!showUserMenu)}
+                    >
+                      <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-sm font-semibold">
+                          {user?.firstName?.[0]}{user?.lastName?.[0]}
+                        </span>
+                      </div>
+                      <div className="text-sm">
+                        <p className="font-medium text-gray-900">{user?.firstName} {user?.lastName}</p>
+                        <p className="text-gray-500">@{user?.username}</p>
+                      </div>
+                      <svg 
+                        className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${showUserMenu ? 'rotate-180' : ''}`} 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                    
+                    {showUserMenu && (
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
+                        <button
+                          onClick={handleLogout}
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                          </svg>
+                          <span>Sign out</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Board Content */}
-          <div className="p-6">
+          <div className="p-6" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             <DragDropContext onDragEnd={onDragEnd}>
-              <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto' }}>
+              <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', height: '100%', flex: 1 }}>
                 {board.columns.map((col) => {
                   const columnCards = board.cards.filter(card => card.columnId === col._id);
                   const isEmpty = columnCards.length === 0;
@@ -688,7 +731,7 @@ const BoardView: React.FC = () => {
                           {...provided.droppableProps}
                           style={{
                             width: '275px',
-                            minHeight: '500px',
+                            height: '100%',
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'stretch',
@@ -697,11 +740,10 @@ const BoardView: React.FC = () => {
                             borderRadius: '8px',
                             padding: '1rem',
                             boxSizing: 'border-box',
-                            overflowY: 'auto',
                             flexShrink: 0,
                           }}
                         >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexShrink: 0 }}>
                             <div 
                               style={{ 
                                 flex: 1,
@@ -812,7 +854,13 @@ const BoardView: React.FC = () => {
                             </button>
                           </div>
                           
-                          <div style={{ minHeight: '200px' }}>
+                          <div style={{ 
+                            flex: 1, 
+                            overflowY: 'auto', 
+                            overflowX: 'hidden',
+                            minHeight: 0,
+                            marginBottom: '1rem'
+                          }}>
                             {columnCards
                               .sort((a, b) => a.position - b.position)
                               .map((card, index) => (
@@ -853,7 +901,7 @@ const BoardView: React.FC = () => {
                             {!isEmpty && provided.placeholder}
                           </div>
                           
-                          <div style={{ marginTop: 'auto', paddingTop: '1rem' }}>
+                          <div style={{ flexShrink: 0 }}>
                             <button
                               style={{
                                 width: '100%',

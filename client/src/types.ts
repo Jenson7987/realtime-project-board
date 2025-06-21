@@ -34,4 +34,5 @@ export interface Board {
   cards: Card[];
   createdAt: string;
   updatedAt: string;
+  isStarred?: boolean;
 } 

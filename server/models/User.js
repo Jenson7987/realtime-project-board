@@ -36,7 +36,11 @@ const userSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
-  }
+  },
+  starredBoards: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Board'
+  }]
 });
 
 // Hash password before saving
