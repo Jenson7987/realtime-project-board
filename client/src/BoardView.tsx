@@ -427,15 +427,15 @@ const BoardView: React.FC = () => {
 
       if (!response.ok) throw new Error('Failed to create card');
       
-      const newCard = await response.json();
-      
-      setBoard(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          cards: [...prev.cards, newCard]
-        };
-      });
+      // Server will emit cardCreated event, so we don't need to update state here
+      // const newCard = await response.json();
+      // setBoard(prev => {
+      //   if (!prev) return null;
+      //   return {
+      //     ...prev,
+      //     cards: [...prev.cards, newCard]
+      //   };
+      // });
       
       closeAddCardModal();
     } catch (error) {
