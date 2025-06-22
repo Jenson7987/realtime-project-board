@@ -250,6 +250,36 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Handle card movement
+  socket.on('moveCard', async (data) => {
+    try {
+      const board = await Board.findOne({
+        _id: data.boardId,
+        $or: [
+          { owner: socket.user._id },
+          { sharedWith: { $in: [socket.user._id] } }
+        ]
+      });
+
+      if (!board) {
+        return socket.emit('error', 'Access denied');
+      }
+
+      // Broadcast the move to other clients in the same board
+      socket.to(data.boardId.toString()).emit('cardMoved', {
+        boardId: data.boardId,
+        cardId: data.cardId,
+        sourceColumnId: data.sourceColumnId,
+        destinationColumnId: data.destinationColumnId,
+        sourceIndex: data.sourceIndex,
+        destinationIndex: data.destinationIndex
+      });
+    } catch (error) {
+      console.error('Error handling card move:', error);
+      socket.emit('error', 'Failed to process card move');
+    }
+  });
+
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.user.username);
   });

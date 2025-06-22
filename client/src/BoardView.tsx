@@ -187,12 +187,82 @@ const BoardView: React.FC = () => {
       });
     };
 
+    const handleCardMoved = (data: { 
+      boardId: string; 
+      cardId: string; 
+      sourceColumnId: string; 
+      destinationColumnId: string; 
+      sourceIndex: number; 
+      destinationIndex: number; 
+    }) => {
+      console.log('Received cardMoved event:', data);
+      setBoard(prev => {
+        if (!prev) return null;
+        
+        const card = prev.cards.find(c => c._id === data.cardId);
+        if (!card) return prev;
+
+        // Create a new cards array with the updated card
+        const newCards = prev.cards.map(c => {
+          if (c._id === data.cardId) {
+            return {
+              ...c,
+              columnId: data.destinationColumnId,
+              position: data.destinationIndex
+            };
+          }
+          return c;
+        });
+
+        // Handle position adjustments based on whether it's same column or different column
+        if (data.sourceColumnId === data.destinationColumnId) {
+          // Same column move
+          newCards.forEach(c => {
+            if (c.columnId === data.sourceColumnId && c._id !== data.cardId) {
+              if (data.sourceIndex < data.destinationIndex) {
+                // Moving down: shift cards between source and destination down
+                if (c.position > data.sourceIndex && c.position <= data.destinationIndex) {
+                  c.position -= 1;
+                }
+              } else {
+                // Moving up: shift cards between destination and source up
+                if (c.position >= data.destinationIndex && c.position < data.sourceIndex) {
+                  c.position += 1;
+                }
+              }
+            }
+          });
+        } else {
+          // Different column move
+          // Update positions of other cards in the source column
+          newCards.forEach(c => {
+            if (c.columnId === data.sourceColumnId && c.position > data.sourceIndex && c._id !== data.cardId) {
+              c.position -= 1;
+            }
+          });
+
+          // Update positions of other cards in the destination column
+          newCards.forEach(c => {
+            if (c.columnId === data.destinationColumnId && c.position >= data.destinationIndex && c._id !== data.cardId) {
+              c.position += 1;
+            }
+          });
+        }
+
+        return {
+          ...prev,
+          cards: newCards
+        };
+      });
+    };
+
     socket.on('cardUpdated', handleCardUpdate);
     socket.on('cardCreated', handleCardCreate);
     socket.on('cardDeleted', handleCardDelete);
     socket.on('columnUpdated', handleColumnUpdate);
     socket.on('columnCreated', handleColumnCreate);
     socket.on('columnDeleted', handleColumnDelete);
+    socket.on('cardMoved', handleCardMoved);
 
     // Cleanup function
     return () => {
@@ -203,6 +273,7 @@ const BoardView: React.FC = () => {
       socket.off('columnUpdated', handleColumnUpdate);
       socket.off('columnCreated', handleColumnCreate);
       socket.off('columnDeleted', handleColumnDelete);
+      socket.off('cardMoved', handleCardMoved);
     };
   }, [socket]); // Only depend on socket, not board
 
@@ -236,19 +307,40 @@ const BoardView: React.FC = () => {
       return c;
     });
 
-    // Update positions of other cards in the source column
-    newCards.forEach(c => {
-      if (c.columnId === source.droppableId && c.position >= source.index && c._id !== draggableId) {
-        c.position -= 1;
-      }
-    });
+    // Handle position adjustments based on whether it's same column or different column
+    if (source.droppableId === destination.droppableId) {
+      // Same column move
+      newCards.forEach(c => {
+        if (c.columnId === source.droppableId && c._id !== draggableId) {
+          if (source.index < destination.index) {
+            // Moving down: shift cards between source and destination down
+            if (c.position > source.index && c.position <= destination.index) {
+              c.position -= 1;
+            }
+          } else {
+            // Moving up: shift cards between destination and source up
+            if (c.position >= destination.index && c.position < source.index) {
+              c.position += 1;
+            }
+          }
+        }
+      });
+    } else {
+      // Different column move
+      // Update positions of other cards in the source column
+      newCards.forEach(c => {
+        if (c.columnId === source.droppableId && c.position > source.index && c._id !== draggableId) {
+          c.position -= 1;
+        }
+      });
 
-    // Update positions of other cards in the destination column
-    newCards.forEach(c => {
-      if (c.columnId === destination.droppableId && c.position >= destination.index && c._id !== draggableId) {
-        c.position += 1;
-      }
-    });
+      // Update positions of other cards in the destination column
+      newCards.forEach(c => {
+        if (c.columnId === destination.droppableId && c.position >= destination.index && c._id !== draggableId) {
+          c.position += 1;
+        }
+      });
+    }
 
     // Update the board state immediately for smooth visual transition
     setBoard(prev => ({
@@ -277,6 +369,7 @@ const BoardView: React.FC = () => {
       // Emit the move event
       if (socket) {
         socket.emit('moveCard', {
+          boardId: board._id,
           cardId: draggableId,
           sourceColumnId: source.droppableId,
           destinationColumnId: destination.droppableId,
@@ -606,7 +699,6 @@ const BoardView: React.FC = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/');
   };
 
   const handleDeleteBoard = async () => {

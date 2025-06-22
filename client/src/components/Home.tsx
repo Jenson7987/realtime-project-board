@@ -27,7 +27,6 @@ const Home: React.FC = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/');
   };
 
   return (

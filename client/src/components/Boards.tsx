@@ -150,7 +150,6 @@ const Boards: React.FC = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/');
   };
 
   const handleStarBoard = async (boardId: string, isStarred: boolean, e: React.MouseEvent) => {

@@ -26,6 +26,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [isLoading, setIsLoading] = useState(!!localStorage.getItem('token'));
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -114,10 +115,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    setIsLoggingOut(true);
     localStorage.removeItem('token');
     setToken(null);
     setUser(null);
-    // Note: Navigation will be handled by the component that calls logout
+    
+    // Use window.location to force navigation to home page
+    window.location.href = '/';
   };
 
   return (
@@ -127,7 +131,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       login, 
       register, 
       logout,
-      isAuthenticated: !!token && !!user,
+      isAuthenticated: !!token && !!user && !isLoggingOut,
       isLoading: isLoading
     }}>
       {children}
