@@ -17,7 +17,7 @@ router.get('/', auth, async (req, res) => {
     const boards = await Board.find({
       $or: [
         { owner: req.user._id },
-        { sharedWith: req.user._id }
+        { sharedWith: { $in: [req.user._id] } }
       ]
     })
     .populate('owner', 'username email firstName lastName')
@@ -147,16 +147,25 @@ router.post('/', auth, async (req, res) => {
 router.get('/:username/:slug', auth, async (req, res) => {
   try {
     const { username, slug } = req.params;
-    console.log('Fetching board:', { username, slug });
+    console.log('Fetching board:', { username, slug, userId: req.user._id });
 
     const board = await Board.findOne({
       ownerUsername: username.toLowerCase(),
       slug: slug,
       $or: [
         { owner: req.user._id },
-        { sharedWith: req.user._id }
+        { sharedWith: { $in: [req.user._id] } }
       ]
     }).populate('owner', 'username email firstName lastName');
+
+    console.log('Board query result:', {
+      found: !!board,
+      boardId: board?._id,
+      owner: board?.owner?._id,
+      sharedWith: board?.sharedWith,
+      userIsOwner: board?.owner?._id?.toString() === req.user._id?.toString(),
+      userInSharedWith: board?.sharedWith?.some(id => id.toString() === req.user._id?.toString())
+    });
 
     if (!board) {
       return res.status(404).json({ error: 'Board not found' });
@@ -176,7 +185,7 @@ router.get('/slug/:slug', auth, async (req, res) => {
       slug: req.params.slug,
       $or: [
         { owner: req.user._id },
-        { sharedWith: req.user._id }
+        { sharedWith: { $in: [req.user._id] } }
       ]
     }).populate('owner', 'username email firstName lastName');
 
@@ -191,6 +200,185 @@ router.get('/slug/:slug', auth, async (req, res) => {
   }
 });
 
+// POST /api/boards/:boardId/share - Share board with a user
+router.post('/:boardId/share', auth, async (req, res) => {
+  try {
+    const { boardId } = req.params;
+    const { username, email } = req.body;
+
+    console.log('Share board request:', { boardId, username, email, requesterId: req.user._id });
+
+    if (!username && !email) {
+      return res.status(400).json({ error: 'Username or email is required' });
+    }
+
+    // Find the board and ensure user is the owner
+    const board = await Board.findOne({
+      _id: boardId,
+      owner: req.user._id
+    });
+
+    console.log('Board found:', {
+      found: !!board,
+      boardId: board?._id,
+      owner: board?.owner,
+      currentSharedWith: board?.sharedWith
+    });
+
+    if (!board) {
+      return res.status(404).json({ error: 'Board not found or unauthorized' });
+    }
+
+    // Find the user to share with by username or email
+    let userToShare;
+    if (username) {
+      userToShare = await User.findOne({ username: username.toLowerCase() });
+    } else if (email) {
+      userToShare = await User.findOne({ email: email.toLowerCase() });
+    }
+
+    console.log('User to share with found:', {
+      found: !!userToShare,
+      userId: userToShare?._id,
+      username: userToShare?.username,
+      email: userToShare?.email
+    });
+
+    if (!userToShare) {
+      const searchTerm = username || email;
+      return res.status(404).json({ error: `User not found with ${username ? 'username' : 'email'}: ${searchTerm}` });
+    }
+
+    // Check if user is trying to share with themselves
+    if (userToShare._id.toString() === req.user._id.toString()) {
+      return res.status(400).json({ error: 'Cannot share board with yourself' });
+    }
+
+    // Check if board is already shared with this user
+    const alreadyShared = board.sharedWith.some(id => id.toString() === userToShare._id.toString());
+    console.log('Already shared check:', {
+      alreadyShared,
+      userToShareId: userToShare._id.toString(),
+      sharedWithIds: board.sharedWith.map(id => id.toString())
+    });
+
+    if (alreadyShared) {
+      return res.status(400).json({ error: 'Board is already shared with this user' });
+    }
+
+    // Add user to sharedWith array
+    board.sharedWith.push(userToShare._id);
+    await board.save();
+
+    console.log('Board saved with new sharedWith:', {
+      newSharedWith: board.sharedWith.map(id => id.toString())
+    });
+
+    // Emit socket event for real-time updates
+    req.app.get('io').to(boardId).emit('boardShared', {
+      boardId,
+      sharedWith: userToShare._id,
+      username: userToShare.username
+    });
+
+    res.json({ 
+      success: true, 
+      message: `Board shared with @${userToShare.username}`,
+      sharedWith: {
+        _id: userToShare._id,
+        username: userToShare.username,
+        firstName: userToShare.firstName,
+        lastName: userToShare.lastName
+      }
+    });
+  } catch (err) {
+    console.error('Error sharing board:', err);
+    res.status(500).json({ error: 'Failed to share board' });
+  }
+});
+
+// GET /api/boards/:boardId/collaborators - Get board collaborators
+router.get('/:boardId/collaborators', auth, async (req, res) => {
+  try {
+    const { boardId } = req.params;
+
+    const board = await Board.findOne({
+      _id: boardId,
+      $or: [
+        { owner: req.user._id },
+        { sharedWith: { $in: [req.user._id] } }
+      ]
+    }).populate('sharedWith', 'username firstName lastName email');
+
+    if (!board) {
+      return res.status(404).json({ error: 'Board not found or unauthorized' });
+    }
+
+    // Get owner information
+    const owner = await User.findById(board.owner).select('username firstName lastName email');
+
+    res.json({
+      owner: {
+        _id: owner._id,
+        username: owner.username,
+        firstName: owner.firstName,
+        lastName: owner.lastName,
+        email: owner.email
+      },
+      collaborators: board.sharedWith.map(user => ({
+        _id: user._id,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email
+      }))
+    });
+  } catch (err) {
+    console.error('Error fetching collaborators:', err);
+    res.status(500).json({ error: 'Failed to fetch collaborators' });
+  }
+});
+
+// DELETE /api/boards/:boardId/share/:userId - Remove collaborator from board
+router.delete('/:boardId/share/:userId', auth, async (req, res) => {
+  try {
+    const { boardId, userId } = req.params;
+
+    // Find the board and ensure user is the owner
+    const board = await Board.findOne({
+      _id: boardId,
+      owner: req.user._id
+    });
+
+    if (!board) {
+      return res.status(404).json({ error: 'Board not found or unauthorized' });
+    }
+
+    // Check if user is in sharedWith array
+    if (!board.sharedWith.includes(userId)) {
+      return res.status(400).json({ error: 'User is not a collaborator on this board' });
+    }
+
+    // Remove user from sharedWith array
+    board.sharedWith = board.sharedWith.filter(id => id.toString() !== userId);
+    await board.save();
+
+    // Emit socket event for real-time updates
+    req.app.get('io').to(boardId).emit('collaboratorRemoved', {
+      boardId,
+      removedUserId: userId
+    });
+
+    res.json({ 
+      success: true, 
+      message: 'Collaborator removed from board' 
+    });
+  } catch (err) {
+    console.error('Error removing collaborator:', err);
+    res.status(500).json({ error: 'Failed to remove collaborator' });
+  }
+});
+
 // GET /api/boards/:boardId - Get one board and its cards (legacy route)
 router.get('/:boardId', auth, async (req, res) => {
   try {
@@ -198,7 +386,7 @@ router.get('/:boardId', auth, async (req, res) => {
       _id: req.params.boardId,
       $or: [
         { owner: req.user._id },
-        { sharedWith: req.user._id }
+        { sharedWith: { $in: [req.user._id] } }
       ]
     }).populate('owner', 'username email firstName lastName');
 
@@ -461,7 +649,7 @@ router.post('/:boardId/star', auth, async (req, res) => {
       _id: boardId,
       $or: [
         { owner: req.user._id },
-        { sharedWith: req.user._id }
+        { sharedWith: { $in: [req.user._id] } }
       ]
     });
 

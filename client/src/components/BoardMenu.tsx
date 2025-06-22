@@ -43,7 +43,7 @@ const BoardMenu: React.FC = () => {
   };
 
   const isActiveBoard = (boardSlug: string) => {
-    return location.pathname === `/b/${boardSlug}`;
+    return location.pathname.includes(`/${boardSlug}`);
   };
 
   return (
@@ -107,7 +107,7 @@ const BoardMenu: React.FC = () => {
                 {boards.map((board) => (
                   <Link
                     key={board._id}
-                    to={`/b/${board.slug}`}
+                    to={`/${board.ownerUsername}/${board.slug}`}
                     onClick={closeMenu}
                     className={`block p-4 rounded-lg transition-all duration-200 hover:bg-blue-50 hover:shadow-md ${
                       isActiveBoard(board.slug)

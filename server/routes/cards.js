@@ -13,7 +13,7 @@ router.post('/', auth, async (req, res) => {
       _id: boardId,
       $or: [
         { owner: req.user._id },
-        { sharedWith: req.user._id }
+        { sharedWith: { $in: [req.user._id] } }
       ]
     });
 
@@ -42,11 +42,14 @@ router.post('/', auth, async (req, res) => {
     console.log('Created card:', createdCard);
 
     // Emit socket event for real-time updates
-    console.log('Emitting cardCreated event');
-    req.app.get('io').to(boardId).emit('cardCreated', {
-      boardId,
+    console.log('Emitting cardCreated event to room:', boardId);
+    const room = req.app.get('io').sockets.adapter.rooms.get(boardId.toString());
+    console.log(`Number of clients in room ${boardId}:`, room ? room.size : 0);
+    req.app.get('io').to(boardId.toString()).emit('cardCreated', {
+      boardId: boardId.toString(),
       card: createdCard
     });
+    console.log('cardCreated event emitted successfully');
 
     res.json(createdCard);
   } catch (error) {
@@ -65,7 +68,7 @@ router.put('/:boardId/:cardId', auth, async (req, res) => {
       _id: boardId,
       $or: [
         { owner: req.user._id },
-        { sharedWith: req.user._id }
+        { sharedWith: { $in: [req.user._id] } }
       ]
     });
 
@@ -116,10 +119,12 @@ router.put('/:boardId/:cardId', auth, async (req, res) => {
     await board.save();
 
     // Emit socket event for real-time updates
-    req.app.get('io').to(boardId).emit('cardUpdated', {
-      boardId,
+    console.log('Emitting cardUpdated event to room:', boardId);
+    req.app.get('io').to(boardId.toString()).emit('cardUpdated', {
+      boardId: boardId.toString(),
       card
     });
+    console.log('cardUpdated event emitted successfully');
 
     res.json(card);
   } catch (error) {
@@ -137,7 +142,7 @@ router.delete('/:boardId/:cardId', auth, async (req, res) => {
       _id: boardId,
       $or: [
         { owner: req.user._id },
-        { sharedWith: req.user._id }
+        { sharedWith: { $in: [req.user._id] } }
       ]
     });
 
@@ -154,10 +159,12 @@ router.delete('/:boardId/:cardId', auth, async (req, res) => {
     await board.save();
 
     // Emit socket event for real-time updates
-    req.app.get('io').to(boardId).emit('cardDeleted', {
-      boardId,
+    console.log('Emitting cardDeleted event to room:', boardId);
+    req.app.get('io').to(boardId.toString()).emit('cardDeleted', {
+      boardId: boardId.toString(),
       cardId
     });
+    console.log('cardDeleted event emitted successfully');
 
     res.json({ message: 'Card deleted' });
   } catch (error) {

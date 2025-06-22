@@ -150,7 +150,7 @@ const Boards: React.FC = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/');
   };
 
   const handleStarBoard = async (boardId: string, isStarred: boolean, e: React.MouseEvent) => {
@@ -371,7 +371,7 @@ const Boards: React.FC = () => {
                 {boards.filter(board => board.isStarred).map((board) => (
                   <Link
                     key={board._id}
-                    to={`/${user?.username}/${board.slug}`}
+                    to={`/${board.ownerUsername}/${board.slug}`}
                     className="group bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-blue-300 transition-all duration-300 transform hover:scale-[1.02] relative"
                   >
                     <div className="absolute top-4 right-4 z-10">
@@ -454,7 +454,7 @@ const Boards: React.FC = () => {
                 {boards.map((board) => (
                   <Link
                     key={board._id}
-                    to={`/${user?.username}/${board.slug}`}
+                    to={`/${board.ownerUsername}/${board.slug}`}
                     className="group bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-blue-300 transition-all duration-300 transform hover:scale-[1.02] relative"
                   >
                     <div className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">

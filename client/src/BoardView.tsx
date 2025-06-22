@@ -10,6 +10,7 @@ import { API_BASE_URL } from './config';
 import { useAuth } from './contexts/AuthContext';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useSocket } from './hooks/useSocket';
+import ShareBoardModal from './components/ShareBoardModal';
 
 const BoardView: React.FC = () => {
   const { token, isAuthenticated, isLoading, user, logout } = useAuth();
@@ -40,6 +41,7 @@ const BoardView: React.FC = () => {
   const [showBoardMenu, setShowBoardMenu] = useState(false);
   const [showDeleteBoardModal, setShowDeleteBoardModal] = useState(false);
   const [isDeletingBoard, setIsDeletingBoard] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const editRef = useRef<HTMLInputElement>(null);
   
   useEffect(() => {
@@ -98,39 +100,59 @@ const BoardView: React.FC = () => {
   useEffect(() => {
     if (!socket || !board) return;
 
-    const handleCardUpdate = (updatedCard: Card) => {
+    console.log('Socket connection status:', socket.connected);
+    console.log('Joining board room:', board._id);
+    socket.emit('joinBoard', board._id);
+
+    // Cleanup function
+    return () => {
+      console.log('Leaving board room:', board._id);
+      socket.emit('leaveBoard', board._id);
+    };
+  }, [socket, board]);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    console.log('Setting up socket event listeners');
+
+    const handleCardUpdate = (data: { boardId: string; card: Card }) => {
+      console.log('Received cardUpdated event:', data);
       setBoard(prev => {
         if (!prev) return null;
         return {
           ...prev,
           cards: prev.cards.map(card => 
-            card._id === updatedCard._id ? updatedCard : card
+            card._id === data.card._id ? data.card : card
           )
         };
       });
     };
 
-    const handleCardCreate = (newCard: Card) => {
+    const handleCardCreate = (data: { boardId: string; card: Card }) => {
+      console.log('Received cardCreated event:', data);
       setBoard(prev => {
         if (!prev) return null;
         return {
           ...prev,
-          cards: [...prev.cards, newCard]
+          cards: [...prev.cards, data.card]
         };
       });
     };
 
-    const handleCardDelete = (deletedCardId: string) => {
+    const handleCardDelete = (data: { boardId: string; cardId: string }) => {
+      console.log('Received cardDeleted event:', data);
       setBoard(prev => {
         if (!prev) return null;
         return {
           ...prev,
-          cards: prev.cards.filter(card => card._id !== deletedCardId)
+          cards: prev.cards.filter(card => card._id !== data.cardId)
         };
       });
     };
 
     const handleColumnUpdate = (data: { columnId: string; title: string }) => {
+      console.log('Received columnUpdated event:', data);
       setBoard(prev => {
         if (!prev) return null;
         return {
@@ -143,6 +165,7 @@ const BoardView: React.FC = () => {
     };
 
     const handleColumnCreate = (newColumn: Column) => {
+      console.log('Received columnCreated event:', newColumn);
       setBoard(prev => {
         if (!prev) return null;
         return {
@@ -153,6 +176,7 @@ const BoardView: React.FC = () => {
     };
 
     const handleColumnDelete = (deletedColumnId: string) => {
+      console.log('Received columnDeleted event:', deletedColumnId);
       setBoard(prev => {
         if (!prev) return null;
         return {
@@ -170,7 +194,9 @@ const BoardView: React.FC = () => {
     socket.on('columnCreated', handleColumnCreate);
     socket.on('columnDeleted', handleColumnDelete);
 
+    // Cleanup function
     return () => {
+      console.log('Cleaning up socket event listeners');
       socket.off('cardUpdated', handleCardUpdate);
       socket.off('cardCreated', handleCardCreate);
       socket.off('cardDeleted', handleCardDelete);
@@ -178,7 +204,7 @@ const BoardView: React.FC = () => {
       socket.off('columnCreated', handleColumnCreate);
       socket.off('columnDeleted', handleColumnDelete);
     };
-  }, [socket, board]);
+  }, [socket]); // Only depend on socket, not board
 
   const onDragEnd = async (result: DropResult) => {
     const { destination, source, draggableId } = result;
@@ -310,13 +336,6 @@ const BoardView: React.FC = () => {
       
       const newCard = await response.json();
       
-      // Emit socket event
-      socket?.emit('cardCreated', {
-        card: newCard,
-        columnId: addCardColumnId,
-        boardId: board._id
-      });
-
       setBoard(prev => {
         if (!prev) return null;
         return {
@@ -420,11 +439,11 @@ const BoardView: React.FC = () => {
       
       const updatedCard = await response.json();
       
-      // Emit socket event
-      socket?.emit('cardUpdated', {
-        card: updatedCard,
-        boardId: board._id
-      });
+      // Server will emit the socket event, so we don't need to emit it here
+      // socket?.emit('cardUpdated', {
+      //   card: updatedCard,
+      //   boardId: board._id
+      // });
 
       setBoard(prev => {
         if (!prev) return null;
@@ -466,12 +485,12 @@ const BoardView: React.FC = () => {
         throw new Error(message);
       }
       
-      // Emit socket event
-      socket?.emit('cardDeleted', {
-        cardId: selectedCard._id,
-        columnId: selectedCard.columnId,
-        boardId: board._id
-      });
+      // Server will emit the socket event, so we don't need to emit it here
+      // socket?.emit('cardDeleted', {
+      //   cardId: selectedCard._id,
+      //   columnId: selectedCard.columnId,
+      //   boardId: board._id
+      // });
 
       setBoard(prev => {
         if (!prev) return null;
@@ -587,7 +606,7 @@ const BoardView: React.FC = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/');
   };
 
   const handleDeleteBoard = async () => {
@@ -717,7 +736,17 @@ const BoardView: React.FC = () => {
                     <span>Back to Boards</span>
                   </Link>
                   <div className="h-6 w-px bg-gray-300"></div>
-                  <h1 className="text-xl font-semibold text-gray-900">{board.title}</h1>
+                  <div className="flex items-center space-x-2">
+                    <h1 className="text-xl font-semibold text-gray-900">{board.title}</h1>
+                    {board.sharedWith && board.sharedWith.length > 0 && (
+                      <div className="flex items-center space-x-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                        </svg>
+                        <span>{board.sharedWith.length} shared</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center space-x-4">
                   <div className="relative board-menu-container">
@@ -733,6 +762,18 @@ const BoardView: React.FC = () => {
                     
                     {showBoardMenu && (
                       <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
+                        <button
+                          onClick={() => {
+                            setShowShareModal(true);
+                            setShowBoardMenu(false);
+                          }}
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
+                          </svg>
+                          <span>Share board</span>
+                        </button>
                         <button
                           onClick={() => {
                             setShowDeleteBoardModal(true);
@@ -1351,6 +1392,14 @@ const BoardView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Share Board Modal */}
+      <ShareBoardModal
+        boardId={board?._id || ''}
+        boardTitle={board?.title || ''}
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+      />
     </div>
   );
 };

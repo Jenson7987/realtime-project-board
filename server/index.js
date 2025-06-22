@@ -89,20 +89,23 @@ io.on('connection', (socket) => {
   // Join a board room
   socket.on('joinBoard', async (boardId) => {
     try {
+      console.log(`User ${socket.user.username} attempting to join board: ${boardId}`);
       const board = await Board.findOne({
         _id: boardId,
         $or: [
           { owner: socket.user._id },
-          { sharedWith: socket.user._id }
+          { sharedWith: { $in: [socket.user._id] } }
         ]
       });
 
       if (!board) {
+        console.log(`Access denied for user ${socket.user.username} to board ${boardId}`);
         return socket.emit('error', 'Access denied');
       }
 
-      socket.join(boardId);
-      console.log(`${socket.user.username} joined board: ${boardId}`);
+      socket.join(boardId.toString());
+      console.log(`${socket.user.username} successfully joined board: ${boardId}`);
+      console.log(`Socket rooms after join:`, Array.from(socket.rooms));
     } catch (error) {
       console.error('Error joining board:', error);
       socket.emit('error', 'Failed to join board');
@@ -111,7 +114,7 @@ io.on('connection', (socket) => {
 
   // Leave a board room
   socket.on('leaveBoard', (boardId) => {
-    socket.leave(boardId);
+    socket.leave(boardId.toString());
     console.log(`${socket.user.username} left board: ${boardId}`);
   });
 
@@ -122,7 +125,7 @@ io.on('connection', (socket) => {
         _id: data.boardId,
         $or: [
           { owner: socket.user._id },
-          { sharedWith: socket.user._id }
+          { sharedWith: { $in: [socket.user._id] } }
         ]
       });
 
@@ -130,7 +133,7 @@ io.on('connection', (socket) => {
         return socket.emit('error', 'Access denied');
       }
 
-      socket.to(data.boardId).emit('cardUpdated', data);
+      socket.to(data.boardId.toString()).emit('cardUpdated', data);
     } catch (error) {
       console.error('Error updating card:', error);
       socket.emit('error', 'Failed to update card');
@@ -144,7 +147,7 @@ io.on('connection', (socket) => {
         _id: data.boardId,
         $or: [
           { owner: socket.user._id },
-          { sharedWith: socket.user._id }
+          { sharedWith: { $in: [socket.user._id] } }
         ]
       });
 
@@ -152,7 +155,7 @@ io.on('connection', (socket) => {
         return socket.emit('error', 'Access denied');
       }
 
-      socket.to(data.boardId).emit('cardCreated', data);
+      socket.to(data.boardId.toString()).emit('cardCreated', data);
     } catch (error) {
       console.error('Error creating card:', error);
       socket.emit('error', 'Failed to create card');
@@ -166,7 +169,7 @@ io.on('connection', (socket) => {
         _id: data.boardId,
         $or: [
           { owner: socket.user._id },
-          { sharedWith: socket.user._id }
+          { sharedWith: { $in: [socket.user._id] } }
         ]
       });
 
@@ -174,7 +177,7 @@ io.on('connection', (socket) => {
         return socket.emit('error', 'Access denied');
       }
 
-      socket.to(data.boardId).emit('cardDeleted', data);
+      socket.to(data.boardId.toString()).emit('cardDeleted', data);
     } catch (error) {
       console.error('Error deleting card:', error);
       socket.emit('error', 'Failed to delete card');
@@ -188,7 +191,7 @@ io.on('connection', (socket) => {
         _id: data.boardId,
         $or: [
           { owner: socket.user._id },
-          { sharedWith: socket.user._id }
+          { sharedWith: { $in: [socket.user._id] } }
         ]
       });
 
@@ -210,7 +213,7 @@ io.on('connection', (socket) => {
         _id: data.boardId,
         $or: [
           { owner: socket.user._id },
-          { sharedWith: socket.user._id }
+          { sharedWith: { $in: [socket.user._id] } }
         ]
       });
 
@@ -232,7 +235,7 @@ io.on('connection', (socket) => {
         _id: data.boardId,
         $or: [
           { owner: socket.user._id },
-          { sharedWith: socket.user._id }
+          { sharedWith: { $in: [socket.user._id] } }
         ]
       });
 
