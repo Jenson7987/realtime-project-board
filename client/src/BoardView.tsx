@@ -36,8 +36,10 @@ const BoardView: React.FC = () => {
   const [cardError, setCardError] = useState<string | null>(null);
   const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
   const [editingColumnTitle, setEditingColumnTitle] = useState('');
-  const [isUpdatingColumn, setIsUpdatingColumn] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showBoardMenu, setShowBoardMenu] = useState(false);
+  const [showDeleteBoardModal, setShowDeleteBoardModal] = useState(false);
+  const [isDeletingBoard, setIsDeletingBoard] = useState(false);
   const editRef = useRef<HTMLInputElement>(null);
   
   useEffect(() => {
@@ -543,22 +545,20 @@ const BoardView: React.FC = () => {
   };
 
   const handleUpdateColumnTitle = async (newTitle: string) => {
-    if (!board || !editingColumnId) return;
+    if (!editingColumnId || !board) return;
     
-    setIsUpdatingColumn(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/boards/${board._id}/columns/${editingColumnId}`, {
+      const response = await fetch(`${API_BASE_URL}/columns/${editingColumnId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ title: newTitle })
       });
 
       if (!response.ok) throw new Error('Failed to update column title');
 
-      const data = await response.json();
       setBoard(prev => {
         if (!prev) return null;
         return {
@@ -580,7 +580,6 @@ const BoardView: React.FC = () => {
     } catch (err) {
       console.error('Error updating column title:', err);
     } finally {
-      setIsUpdatingColumn(false);
       setEditingColumnId(null);
       setEditingColumnTitle('');
     }
@@ -589,6 +588,34 @@ const BoardView: React.FC = () => {
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handleDeleteBoard = async () => {
+    if (!board) return;
+    
+    setIsDeletingBoard(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/boards/${board._id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete board');
+      }
+
+      // Navigate back to home after successful deletion
+      navigate('/');
+    } catch (err) {
+      console.error('Error deleting board:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete board');
+    } finally {
+      setIsDeletingBoard(false);
+      setShowDeleteBoardModal(false);
+      setShowBoardMenu(false);
+    }
   };
 
   // Focus the edit field when it becomes active
@@ -616,6 +643,24 @@ const BoardView: React.FC = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showUserMenu]);
+
+  // Close board menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.board-menu-container')) {
+        setShowBoardMenu(false);
+      }
+    };
+
+    if (showBoardMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showBoardMenu]);
 
   if (isLoading || boardLoading) {
     return (
@@ -657,21 +702,52 @@ const BoardView: React.FC = () => {
         </div>
       ) : (
         <>
-          {/* Header */}
+          {/* Top Bar - Logo and User Account */}
           <div className="bg-white shadow-sm border-b" style={{ flexShrink: 0 }}>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex justify-between items-center py-4">
+              <div className="flex justify-between items-center py-3">
                 <div className="flex items-center space-x-4">
                   <Link
-                    to="/"
-                    className="text-blue-600 hover:text-blue-700 font-medium"
+                    to="/boards"
+                    className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 font-medium transition-colors"
                   >
-                    ← Back to Boards
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    <span>Back to Boards</span>
                   </Link>
                   <div className="h-6 w-px bg-gray-300"></div>
-                  <h1 className="text-2xl font-bold text-gray-900">{board.title}</h1>
+                  <h1 className="text-xl font-semibold text-gray-900">{board.title}</h1>
                 </div>
                 <div className="flex items-center space-x-4">
+                  <div className="relative board-menu-container">
+                    <button
+                      onClick={() => setShowBoardMenu(!showBoardMenu)}
+                      className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors duration-200"
+                      title="Board options"
+                    >
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                      </svg>
+                    </button>
+                    
+                    {showBoardMenu && (
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
+                        <button
+                          onClick={() => {
+                            setShowDeleteBoardModal(true);
+                            setShowBoardMenu(false);
+                          }}
+                          className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          <span>Delete board</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <div className="relative user-menu-container">
                     <div 
                       className="flex items-center space-x-3 bg-white/60 backdrop-blur-sm rounded-full px-4 py-2 border border-gray-200 cursor-pointer hover:bg-white hover:shadow-md transition-all duration-200"
@@ -1182,6 +1258,96 @@ const BoardView: React.FC = () => {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+      {showDeleteBoardModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(0,0,0,0.2)',
+            backdropFilter: 'blur(2px)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onClick={() => setShowDeleteBoardModal(false)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#fff',
+              borderRadius: '8px',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
+              padding: '2rem',
+              minWidth: '400px',
+              maxWidth: '500px',
+              width: '90%',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                background: '#fef2f2',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: '1rem'
+              }}>
+                <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600' }}>Delete Board</h2>
+            </div>
+            
+            <p style={{ marginBottom: '1.5rem', color: '#6b7280', lineHeight: '1.5' }}>
+              Are you sure you want to delete "<strong>{board?.title}</strong>"? This action cannot be undone and will permanently remove the board and all its cards.
+            </p>
+            
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setShowDeleteBoardModal(false)}
+                disabled={isDeletingBoard}
+                style={{
+                  background: '#f3f4f6',
+                  color: '#374151',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '0.75rem 1.5rem',
+                  cursor: 'pointer',
+                  fontWeight: '500',
+                  opacity: isDeletingBoard ? 0.5 : 1
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteBoard}
+                disabled={isDeletingBoard}
+                style={{
+                  background: '#dc2626',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '0.75rem 1.5rem',
+                  cursor: 'pointer',
+                  fontWeight: '500',
+                  opacity: isDeletingBoard ? 0.7 : 1
+                }}
+              >
+                {isDeletingBoard ? 'Deleting...' : 'Delete Board'}
+              </button>
+            </div>
           </div>
         </div>
       )}

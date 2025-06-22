@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import BoardView from './BoardView';
 import Home from './components/Home';
+import Boards from './components/Boards';
 import Login from './components/Login';
 import Register from './components/Register';
 
@@ -48,6 +49,14 @@ function App() {
             }
           />
           <Route
+            path="/boards"
+            element={
+              <PrivateRoute>
+                <Boards />
+              </PrivateRoute>
+            }
+          />
+          <Route
             path="/:username/:slug"
             element={
               <PrivateRoute>
@@ -57,11 +66,7 @@ function App() {
           />
           <Route
             path="/"
-            element={
-              <PrivateRoute>
-                <Home />
-              </PrivateRoute>
-            }
+            element={<Home />}
           />
         </Routes>
       </AuthProvider>
