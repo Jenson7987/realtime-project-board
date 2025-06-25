@@ -265,14 +265,46 @@ io.on('connection', (socket) => {
         return socket.emit('error', 'Access denied');
       }
 
-      // Broadcast the move to other clients in the same board
-      socket.to(data.boardId.toString()).emit('cardMoved', {
-        boardId: data.boardId,
-        cardId: data.cardId,
-        sourceColumnId: data.sourceColumnId,
-        destinationColumnId: data.destinationColumnId,
-        sourceIndex: data.sourceIndex,
-        destinationIndex: data.destinationIndex
+      // Find the card and update it
+      const card = board.cards.id(data.cardId);
+      if (!card) {
+        return socket.emit('error', 'Card not found');
+      }
+
+      const oldColumnId = card.columnId.toString();
+      const oldPosition = card.position;
+
+      // Update the card
+      card.columnId = data.destinationColumnId;
+      card.position = data.destinationIndex;
+
+      // Adjust positions of other cards when column or index changes
+      if (data.destinationColumnId !== oldColumnId || data.destinationIndex !== oldPosition) {
+        // Remove gap in old column
+        board.cards.forEach(c => {
+          if (c.columnId.toString() === oldColumnId && c.position > oldPosition) {
+            c.position -= 1;
+          }
+        });
+
+        // Create space in new column
+        board.cards.forEach(c => {
+          if (
+            c.columnId.toString() === data.destinationColumnId &&
+            c._id.toString() !== data.cardId &&
+            c.position >= data.destinationIndex
+          ) {
+            c.position += 1;
+          }
+        });
+      }
+
+      await board.save();
+
+      // Emit all updated cards to all clients in the room
+      socket.to(data.boardId.toString()).emit('cardsUpdated', {
+        boardId: data.boardId.toString(),
+        cards: board.cards
       });
     } catch (error) {
       console.error('Error handling card move:', error);
