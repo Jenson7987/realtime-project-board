@@ -289,66 +289,56 @@ const BoardView: React.FC = () => {
       return;
     }
 
-    const sourceColumn = board.columns.find(col => col._id === source.droppableId);
-    const destColumn = board.columns.find(col => col._id === destination.droppableId);
-    const card = board.cards.find(c => c._id === draggableId);
+    const prevCards = board.cards;
 
-    if (!sourceColumn || !destColumn || !card) return;
+    const updatedCards = board.cards.map(card => ({ ...card }));
 
-    // Create a new cards array with the updated card
-    const newCards = board.cards.map(c => {
-      if (c._id === draggableId) {
-        return {
-          ...c,
-          columnId: destination.droppableId,
-          position: destination.index
-        };
-      }
-      return c;
-    });
+    const movingCard = updatedCards.find(c => c._id === draggableId);
+    if (!movingCard) return;
 
-    // Handle position adjustments based on whether it's same column or different column
-    if (source.droppableId === destination.droppableId) {
-      // Same column move
-      newCards.forEach(c => {
-        if (c.columnId === source.droppableId && c._id !== draggableId) {
-          if (source.index < destination.index) {
-            // Moving down: shift cards between source and destination down
-            if (c.position > source.index && c.position <= destination.index) {
-              c.position -= 1;
+    const fromColumn = source.droppableId;
+    const toColumn = destination.droppableId;
+    const fromIndex = movingCard.position;
+
+    // Update the moved card with its new location
+    movingCard.columnId = toColumn;
+    movingCard.position = destination.index;
+
+    if (fromColumn === toColumn) {
+      // Moving inside the same column
+      updatedCards.forEach(card => {
+        if (card.columnId === fromColumn && card._id !== draggableId) {
+          if (fromIndex < destination.index) {
+            // Dragging downwards – shift everything between the old and new index up
+            if (card.position > fromIndex && card.position <= destination.index) {
+              card.position -= 1;
             }
           } else {
-            // Moving up: shift cards between destination and source up
-            if (c.position >= destination.index && c.position < source.index) {
-              c.position += 1;
+            // Dragging upwards – shift everything between the new and old index down
+            if (card.position >= destination.index && card.position < fromIndex) {
+              card.position += 1;
             }
           }
         }
       });
     } else {
-      // Different column move
-      // Update positions of other cards in the source column
-      newCards.forEach(c => {
-        if (c.columnId === source.droppableId && c.position > source.index && c._id !== draggableId) {
-          c.position -= 1;
+      // Moving across columns
+      updatedCards.forEach(card => {
+        if (card.columnId === fromColumn && card.position > fromIndex) {
+          // Close the gap left in the source column
+          card.position -= 1;
         }
-      });
-
-      // Update positions of other cards in the destination column
-      newCards.forEach(c => {
-        if (c.columnId === destination.droppableId && c.position >= destination.index && c._id !== draggableId) {
-          c.position += 1;
+        if (card.columnId === toColumn && card._id !== draggableId && card.position >= destination.index) {
+          // Make space in the destination column
+          card.position += 1;
         }
       });
     }
 
-    // Update the board state immediately for smooth visual transition
-    setBoard(prev => ({
-      ...prev!,
-      cards: newCards
-    }));
+    // Optimistically update UI
+    setBoard(prev => (prev ? { ...prev, cards: updatedCards } : prev));
 
-    // Save the changes to the server
+    // Persist change to server
     try {
       const response = await fetch(`${API_BASE_URL}/cards/${board._id}/${draggableId}`, {
         method: 'PUT',
@@ -366,24 +356,19 @@ const BoardView: React.FC = () => {
         throw new Error('Failed to update card position');
       }
 
-      // Emit the move event
-      if (socket) {
-        socket.emit('moveCard', {
-          boardId: board._id,
-          cardId: draggableId,
-          sourceColumnId: source.droppableId,
-          destinationColumnId: destination.droppableId,
-          sourceIndex: source.index,
-          destinationIndex: destination.index
-        });
-      }
+      // Notify other clients of the move
+      socket?.emit('moveCard', {
+        boardId: board._id,
+        cardId: draggableId,
+        sourceColumnId: source.droppableId,
+        destinationColumnId: destination.droppableId,
+        sourceIndex: source.index,
+        destinationIndex: destination.index
+      });
     } catch (error) {
       console.error('Error updating card position:', error);
-      // Revert the board state if the update fails
-      setBoard(prev => ({
-        ...prev!,
-        cards: board.cards
-      }));
+      // Revert optimistic update if something went wrong
+      setBoard(prev => (prev ? { ...prev, cards: prevCards } : prev));
     }
   };
 
