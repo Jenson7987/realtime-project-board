@@ -175,25 +175,25 @@ const BoardView: React.FC = () => {
       });
     };
 
-    const handleColumnCreate = (newColumn: Column) => {
-      console.log('Received columnCreated event:', newColumn);
+    const handleColumnCreate = (data: { boardId: string; column: Column }) => {
+      console.log('Received columnCreated event:', data);
       setBoard(prev => {
         if (!prev) return null;
         return {
           ...prev,
-          columns: [...prev.columns, newColumn]
+          columns: [...prev.columns, data.column]
         };
       });
     };
 
-    const handleColumnDelete = (deletedColumnId: string) => {
-      console.log('Received columnDeleted event:', deletedColumnId);
+    const handleColumnDelete = (data: { boardId: string; columnId: string }) => {
+      console.log('Received columnDeleted event:', data);
       setBoard(prev => {
         if (!prev) return null;
         return {
           ...prev,
-          columns: prev.columns.filter((col: Column) => col._id !== deletedColumnId),
-          cards: prev.cards.filter(card => card.columnId !== deletedColumnId)
+          columns: prev.columns.filter((col: Column) => col._id !== data.columnId),
+          cards: prev.cards.filter(card => card.columnId !== data.columnId)
         };
       });
     };
@@ -349,16 +349,6 @@ const BoardView: React.FC = () => {
 
       if (!response.ok) throw new Error('Failed to create card');
       
-      // Server will emit cardCreated event, so we don't need to update state here
-      // const newCard = await response.json();
-      // setBoard(prev => {
-      //   if (!prev) return null;
-      //   return {
-      //     ...prev,
-      //     cards: [...prev.cards, newCard]
-      //   };
-      // });
-      
       closeAddCardModal();
     } catch (error) {
       console.error('Error creating card:', error);
@@ -399,14 +389,8 @@ const BoardView: React.FC = () => {
         throw new Error('Failed to add column');
       }
 
-      const data = await response.json();
-      setBoard(prevBoard => {
-        if (!prevBoard) return null;
-        return {
-          ...prevBoard,
-          columns: [...prevBoard.columns, data.column]
-        };
-      });
+      // Don't manually update state - let the socket event handle it
+      // This ensures both users see the same result
       setNewColumnName('');
       closeAddColumnModal();
     } catch (error) {
@@ -454,12 +438,6 @@ const BoardView: React.FC = () => {
       
       const updatedCard = await response.json();
       
-      // Server will emit the socket event, so we don't need to emit it here
-      // socket?.emit('cardUpdated', {
-      //   card: updatedCard,
-      //   boardId: board._id
-      // });
-
       setBoard(prev => {
         if (!prev) return null;
         return {
@@ -500,13 +478,6 @@ const BoardView: React.FC = () => {
         throw new Error(message);
       }
       
-      // Server will emit the socket event, so we don't need to emit it here
-      // socket?.emit('cardDeleted', {
-      //   cardId: selectedCard._id,
-      //   columnId: selectedCard.columnId,
-      //   boardId: board._id
-      // });
-
       setBoard(prev => {
         if (!prev) return null;
         return {
@@ -547,20 +518,8 @@ const BoardView: React.FC = () => {
 
       if (!response.ok) throw new Error('Failed to delete column');
       
-      // Emit socket event
-      socket?.emit('columnDeleted', {
-        columnId,
-        boardId: board._id
-      });
-
-      setBoard(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          columns: prev.columns.filter(col => col._id !== columnId),
-          cards: prev.cards.filter(card => card.columnId !== columnId)
-        };
-      });
+      // Don't manually update state - let the socket event handle it
+      // This ensures both users see the same result
       
       setIsDeletingColumn(null);
     } catch (error) {
@@ -569,20 +528,29 @@ const BoardView: React.FC = () => {
   };
 
   const startEditingColumn = (columnId: string, currentTitle: string) => {
+    console.log('Starting to edit column:', columnId, 'with title:', currentTitle);
     setEditingColumnId(columnId);
     setEditingColumnTitle(currentTitle);
   };
 
   const cancelEditingColumn = () => {
+    console.log('Canceling column editing');
     setEditingColumnId(null);
     setEditingColumnTitle('');
   };
 
   const handleUpdateColumnTitle = async (newTitle: string) => {
-    if (!editingColumnId || !board) return;
+    console.log('Updating column title:', editingColumnId, 'to:', newTitle);
+    if (!editingColumnId || !board) {
+      console.log('Missing editingColumnId or board:', { editingColumnId, board: !!board });
+      return;
+    }
     
     try {
-      const response = await fetch(`${API_BASE_URL}/columns/${editingColumnId}`, {
+      const url = `${API_BASE_URL}/boards/${board._id}/columns/${editingColumnId}`;
+      console.log('Making request to:', url);
+      
+      const response = await fetch(url, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -591,7 +559,16 @@ const BoardView: React.FC = () => {
         body: JSON.stringify({ title: newTitle })
       });
 
-      if (!response.ok) throw new Error('Failed to update column title');
+      console.log('Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error('Failed to update column title');
+      }
+
+      const result = await response.json();
+      console.log('Update successful:', result);
 
       setBoard(prev => {
         if (!prev) return null;
@@ -697,617 +674,562 @@ const BoardView: React.FC = () => {
 
   if (isLoading || boardLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl">Loading...</div>
+      <div className="loading-container">
+        <div>Loading board...</div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl text-red-500">{error}</div>
+      <div className="error-container">
+        <div>{error}</div>
       </div>
     );
   }
 
   if (!board) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl">No board found</div>
+      <div className="loading-container">
+        <div>No board found</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100" style={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-      {boardLoading ? (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-xl">Loading...</div>
-        </div>
-      ) : error ? (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-xl text-red-500">{error}</div>
-        </div>
-      ) : !board ? (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-xl">No board found</div>
-        </div>
-      ) : (
-        <>
-          {/* Top Bar - Logo and User Account */}
-          <div className="bg-white shadow-sm border-b" style={{ flexShrink: 0 }}>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex justify-between items-center py-3">
-                <div className="flex items-center space-x-4">
-                  <Link
-                    to="/boards"
-                    className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 font-medium transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
-                    <span>Back to Boards</span>
-                  </Link>
-                  <div className="h-6 w-px bg-gray-300"></div>
-                  <div className="flex items-center space-x-2">
-                    <h1 className="text-xl font-semibold text-gray-900">{board.title}</h1>
-                    {board.sharedWith && board.sharedWith.length > 0 && (
-                      <div className="flex items-center space-x-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                        </svg>
-                        <span>{board.sharedWith.length} shared</span>
-                      </div>
-                    )}
-                  </div>
+    <div className="board-container">
+      {/* Board Header */}
+      <header className="board-header">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+            <Link
+              to="/boards"
+              className="btn btn-ghost"
+              style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M19 12H5M12 19l-7-7 7-7"/>
+              </svg>
+              <span>Back to Boards</span>
+            </Link>
+            
+            <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--color-gray-300)' }}></div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <h1 style={{ fontSize: 'var(--font-size-xl)', fontWeight: '600', color: 'var(--color-gray-900)' }}>
+                {board.title}
+              </h1>
+              {board.sharedWith && board.sharedWith.length > 0 && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-1)',
+                  padding: 'var(--space-1) var(--space-2)',
+                  backgroundColor: 'var(--color-blue-50)',
+                  color: 'var(--color-blue-600)',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: 'var(--font-size-xs)',
+                  fontWeight: '500'
+                }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="m22 21-2-2"/>
+                    <path d="M16 16l4 4"/>
+                  </svg>
+                  <span>{board.sharedWith.length} shared</span>
                 </div>
-                <div className="flex items-center space-x-4">
-                  <div className="relative board-menu-container">
-                    <button
-                      onClick={() => setShowBoardMenu(!showBoardMenu)}
-                      className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors duration-200"
-                      title="Board options"
-                    >
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                      </svg>
-                    </button>
-                    
-                    {showBoardMenu && (
-                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
-                        <button
-                          onClick={() => {
-                            setShowShareModal(true);
-                            setShowBoardMenu(false);
-                          }}
-                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
-                          </svg>
-                          <span>Share board</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            setShowDeleteBoardModal(true);
-                            setShowBoardMenu(false);
-                          }}
-                          className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                          <span>Delete board</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="relative user-menu-container">
-                    <div 
-                      className="flex items-center space-x-3 bg-white/60 backdrop-blur-sm rounded-full px-4 py-2 border border-gray-200 cursor-pointer hover:bg-white hover:shadow-md transition-all duration-200"
-                      onClick={() => setShowUserMenu(!showUserMenu)}
-                    >
-                      <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-                        <span className="text-white text-sm font-semibold">
-                          {user?.firstName?.[0]}{user?.lastName?.[0]}
-                        </span>
-                      </div>
-                      <div className="text-sm">
-                        <p className="font-medium text-gray-900">{user?.firstName} {user?.lastName}</p>
-                        <p className="text-gray-500">@{user?.username}</p>
-                      </div>
-                      <svg 
-                        className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${showUserMenu ? 'rotate-180' : ''}`} 
-                        fill="none" 
-                        stroke="currentColor" 
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
-                    
-                    {showUserMenu && (
-                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
-                        <button
-                          onClick={handleLogout}
-                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                          </svg>
-                          <span>Sign out</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
           </div>
 
-          {/* Board Content */}
-          <div className="p-6" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-            <DragDropContext onDragEnd={onDragEnd}>
-              <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', height: '100%', flex: 1 }}>
-                {board.columns.map((col) => {
-                  const columnCards = board.cards.filter(card => card.columnId === col._id);
-                  const isEmpty = columnCards.length === 0;
-                  
-                  return (
-                    <Droppable droppableId={col._id} key={col._id}>
-                      {(provided, snapshot) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.droppableProps}
-                          style={{
-                            width: '275px',
-                            height: '100%',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'stretch',
-                            backgroundColor: snapshot.isDraggingOver ? '#f0f0f0' : '#fafafa',
-                            border: '1px solid #ddd',
-                            borderRadius: '8px',
-                            padding: '1rem',
-                            boxSizing: 'border-box',
-                            flexShrink: 0,
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexShrink: 0 }}>
-                            <div 
-                              style={{ 
-                                flex: 1,
-                                marginRight: '0.5rem',
-                                padding: '0.25rem 0.5rem',
-                                borderRadius: '4px',
-                                transition: 'background-color 0.2s',
-                                cursor: editingColumnId === col._id ? 'text' : 'pointer',
-                                fontSize: '1.125rem',
-                                fontWeight: '600',
-                                fontFamily: 'inherit',
-                                display: 'flex',
-                                alignItems: 'center',
-                                minHeight: '1.5rem',
-                                border: editingColumnId === col._id ? '2px solid #3b82f6' : '2px solid transparent',
-                                backgroundColor: editingColumnId === col._id ? '#fff' : 'transparent',
-                                outline: 'none'
-                              }}
-                              onMouseEnter={(e) => {
-                                if (editingColumnId !== col._id) {
-                                  e.currentTarget.style.backgroundColor = '#f3f4f6';
-                                }
-                              }}
-                              onMouseLeave={(e) => {
-                                if (editingColumnId !== col._id) {
-                                  e.currentTarget.style.backgroundColor = 'transparent';
-                                }
-                              }}
-                              onClick={() => {
-                                if (editingColumnId !== col._id) {
-                                  startEditingColumn(col._id, col.title || '');
-                                }
-                              }}
-                              title={editingColumnId === col._id ? "Editing..." : "Click to edit column title"}
-                            >
-                              {editingColumnId === col._id ? (
-                                <input
-                                  type="text"
-                                  ref={editRef}
-                                  value={editingColumnTitle}
-                                  onChange={(e) => setEditingColumnTitle(e.target.value)}
-                                  onBlur={() => {
-                                    const newTitle = editingColumnTitle.trim();
-                                    if (newTitle && newTitle !== (col.title || '')) {
-                                      handleUpdateColumnTitle(newTitle);
-                                    } else {
-                                      cancelEditingColumn();
-                                    }
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.preventDefault();
-                                      const newTitle = editingColumnTitle.trim();
-                                      if (newTitle) {
-                                        handleUpdateColumnTitle(newTitle);
-                                      }
-                                    } else if (e.key === 'Escape') {
-                                      cancelEditingColumn();
-                                    }
-                                  }}
-                                  style={{
-                                    width: '100%',
-                                    outline: 'none',
-                                    border: 'none',
-                                    background: 'transparent',
-                                    fontSize: 'inherit',
-                                    fontWeight: 'inherit',
-                                    fontFamily: 'inherit',
-                                    margin: 0,
-                                    padding: 0
-                                  }}
-                                />
-                              ) : (
-                                col.title || 'Untitled Column'
-                              )}
-                            </div>
-                            <button
-                              onClick={() => isEmpty && handleDeleteColumn(col._id)}
-                              disabled={!isEmpty || isDeletingColumn === col._id}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                padding: '0.25rem',
-                                cursor: isEmpty ? 'pointer' : 'not-allowed',
-                                opacity: isDeletingColumn === col._id ? 0.7 : isEmpty ? 0.7 : 0.3,
-                                transition: 'opacity 0.2s',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
-                              title={isEmpty ? 'Delete column' : 'Cannot delete: Column contains cards'}
-                            >
-                              <svg
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                style={{ color: '#dc3545' }}
-                              >
-                                <path d="M3 6h18" />
-                                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                              </svg>
-                            </button>
-                          </div>
-                          
-                          <div style={{ 
-                            flex: 1, 
-                            overflowY: 'auto', 
-                            overflowX: 'hidden',
-                            minHeight: 0,
-                            marginBottom: '1rem'
-                          }}>
-                            {columnCards
-                              .sort((a, b) => a.position - b.position)
-                              .map((card, index) => (
-                                <Draggable draggableId={card._id} index={index} key={card._id}>
-                                  {(provided, snapshot) => (
-                                    <div
-                                      ref={provided.innerRef}
-                                      {...provided.draggableProps}
-                                      {...provided.dragHandleProps}
-                                      onClick={() => handleCardClick(card)}
-                                      style={{
-                                        userSelect: 'none',
-                                        padding: '0.75rem',
-                                        marginBottom: '0.5rem',
-                                        borderRadius: '4px',
-                                        background: snapshot.isDragging ? '#fff' : '#ffffff',
-                                        boxShadow: snapshot.isDragging ? '0 2px 8px rgba(0,0,0,0.2)' : 'none',
-                                        border: '1px solid #ccc',
-                                        cursor: 'pointer',
-                                        ...provided.draggableProps.style
-                                      }}
-                                    >
-                                      <strong>{card.title}</strong>
-                                      {card.description && <p style={{ margin: '0.5rem 0 0' }}>{card.description}</p>}
-                                    </div>
-                                  )}
-                                </Draggable>
-                              ))}
-                            {isEmpty && (
-                              <div style={{
-                                height: '60px',
-                                marginBottom: '0.5rem',
-                                opacity: 0
-                              }}>
-                                {provided.placeholder}
-                              </div>
-                            )}
-                            {!isEmpty && provided.placeholder}
-                          </div>
-                          
-                          <div style={{ flexShrink: 0 }}>
-                            <button
-                              style={{
-                                width: '100%',
-                                background: '#e0e0e0',
-                                border: 'none',
-                                borderRadius: '4px',
-                                padding: '0.5rem',
-                                cursor: 'pointer',
-                                fontWeight: 600,
-                              }}
-                              onClick={() => openAddCardModal(col._id)}
-                            >
-                              + Add Card
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </Droppable>
-                  );
-                })}
-                <button
-                  style={{
-                    width: '275px',
-                    height: '40px',
-                    background: '#e0e0e0',
-                    border: '1px dashed #ccc',
-                    borderRadius: '8px',
-                    padding: '0.5rem',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
-                  onClick={openAddColumnModal}
-                >
-                  + Add Column
-                </button>
-              </div>
-            </DragDropContext>
-          </div>
-        </>
-      )}
-      {showAddCardModal && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            background: 'rgba(0,0,0,0.2)',
-            backdropFilter: 'blur(2px)',
-            zIndex: 1000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-          onClick={closeAddCardModal}
-        >
-          <form
-            onClick={e => e.stopPropagation()}
-            onSubmit={handleAddCard}
-            style={{
-              background: '#fff',
-              borderRadius: '8px',
-              boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
-              padding: '2rem',
-              minWidth: '320px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '1rem',
-            }}
-          >
-            <h2 style={{ margin: 0 }}>Add Card</h2>
-            <input
-              type="text"
-              placeholder="Title"
-              value={newCardTitle}
-              onChange={e => setNewCardTitle(e.target.value)}
-              required
-              style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-              autoFocus
-            />
-            <textarea
-              placeholder="Description (optional)"
-              value={newCardDescription}
-              onChange={e => setNewCardDescription(e.target.value)}
-              style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', minHeight: '60px' }}
-            />
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
-              <button type="button" onClick={closeAddCardModal} style={{ background: '#eee', border: 'none', borderRadius: '4px', padding: '0.5rem 1rem', cursor: 'pointer' }}>Cancel</button>
-              <button type="submit" disabled={isSubmitting || !newCardTitle.trim()} style={{ background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.5rem 1rem', cursor: 'pointer', fontWeight: 600 }}>
-                {isSubmitting ? 'Adding...' : 'Add Card'}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+            {/* Board Menu */}
+            <div className="board-menu-container">
+              <button
+                className="board-menu-trigger"
+                onClick={() => setShowBoardMenu(!showBoardMenu)}
+                title="Board options"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="12" cy="12" r="1"/>
+                  <circle cx="19" cy="12" r="1"/>
+                  <circle cx="5" cy="12" r="1"/>
+                </svg>
               </button>
-            </div>
-          </form>
-        </div>
-      )}
-      {showAddColumnModal && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            background: 'rgba(0,0,0,0.2)',
-            backdropFilter: 'blur(2px)',
-            zIndex: 1000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-          onClick={closeAddColumnModal}
-        >
-          <form
-            onClick={e => e.stopPropagation()}
-            onSubmit={handleAddColumn}
-            style={{
-              background: '#fff',
-              borderRadius: '8px',
-              boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
-              padding: '2rem',
-              minWidth: '320px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '1rem',
-            }}
-          >
-            <h2 style={{ margin: 0 }}>Add Column</h2>
-            <input
-              type="text"
-              placeholder="Column Title"
-              value={newColumnName}
-              onChange={e => setNewColumnName(e.target.value)}
-              required
-              style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-              autoFocus
-            />
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
-              <button type="button" onClick={closeAddColumnModal} style={{ background: '#eee', border: 'none', borderRadius: '4px', padding: '0.5rem 1rem', cursor: 'pointer' }}>Cancel</button>
-              <button type="submit" disabled={isSubmittingColumn || !newColumnName.trim()} style={{ background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.5rem 1rem', cursor: 'pointer', fontWeight: 600 }}>
-                {isSubmittingColumn ? 'Adding...' : 'Add Column'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-      {selectedCard && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            background: 'rgba(0,0,0,0.2)',
-            backdropFilter: 'blur(2px)',
-            zIndex: 1000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-          onClick={closeCardModal}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              background: '#fff',
-              borderRadius: '8px',
-              boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
-              padding: '2rem',
-              minWidth: '320px',
-              maxWidth: '600px',
-              width: '90%',
-            }}
-          >
-            {isEditingCard ? (
-              <form onSubmit={handleEditCard} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <h2 style={{ margin: 0 }}>Edit Card</h2>
-                <input
-                  type="text"
-                  placeholder="Title"
-                  value={editedCardTitle}
-                  onChange={e => setEditedCardTitle(e.target.value)}
-                  required
-                  style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                  autoFocus
-                />
-                <textarea
-                  placeholder="Description (optional)"
-                  value={editedCardDescription}
-                  onChange={e => setEditedCardDescription(e.target.value)}
-                  style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', minHeight: '100px' }}
-                />
-                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              
+              {showBoardMenu && (
+                <div className="board-menu-dropdown fade-in">
                   <button
-                    type="button"
-                    onClick={closeCardModal}
-                    style={{ background: '#eee', border: 'none', borderRadius: '4px', padding: '0.5rem 1rem', cursor: 'pointer' }}
+                    className="board-menu-item"
+                    onClick={() => {
+                      setShowShareModal(true);
+                      setShowBoardMenu(false);
+                    }}
                   >
-                    Cancel
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                      <polyline points="16,6 12,2 8,6"/>
+                      <line x1="12" y1="2" x2="12" y2="15"/>
+                    </svg>
+                    <span>Share board</span>
                   </button>
                   <button
-                    type="submit"
+                    className="board-menu-item danger"
+                    onClick={() => {
+                      setShowDeleteBoardModal(true);
+                      setShowBoardMenu(false);
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="3,6 5,6 21,6"/>
+                      <path d="M19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"/>
+                    </svg>
+                    <span>Delete board</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* User Menu */}
+            <div className="user-menu-container">
+              <div 
+                className="user-menu-trigger"
+                onClick={() => setShowUserMenu(!showUserMenu)}
+              >
+                <div className="user-avatar">
+                  <span>{user?.firstName?.[0]}{user?.lastName?.[0]}</span>
+                </div>
+                <div className="user-info">
+                  <div className="user-name">{user?.firstName} {user?.lastName}</div>
+                  <div className="user-username">@{user?.username}</div>
+                </div>
+                <svg 
+                  width="16" 
+                  height="16" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2"
+                  style={{ 
+                    transform: showUserMenu ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform var(--transition-fast)'
+                  }}
+                >
+                  <polyline points="6,9 12,15 18,9"/>
+                </svg>
+              </div>
+              
+              {showUserMenu && (
+                <div className="user-menu-dropdown fade-in">
+                  <button
+                    className="user-menu-item"
+                    onClick={handleLogout}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                      <polyline points="16,17 21,12 16,7"/>
+                      <line x1="21" y1="12" x2="9" y2="12"/>
+                    </svg>
+                    <span>Sign out</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Board Content */}
+      <main className="board-content">
+        <DragDropContext onDragEnd={onDragEnd}>
+          <div className="board-columns">
+            {board.columns.map((col) => {
+              const columnCards = board.cards.filter(card => card.columnId === col._id);
+              const isEmpty = columnCards.length === 0;
+              
+              return (
+                <Droppable droppableId={col._id} key={col._id}>
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className={`column ${snapshot.isDraggingOver ? 'droppable dragging-over' : 'droppable'}`}
+                    >
+                      <div className="column-header">
+                        <div 
+                          className={`column-title ${editingColumnId === col._id ? 'editing' : ''}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (editingColumnId !== col._id) {
+                              startEditingColumn(col._id, col.title || '');
+                            }
+                          }}
+                          title={editingColumnId === col._id ? "Editing..." : "Click to edit column title"}
+                        >
+                          {editingColumnId === col._id ? (
+                            <input
+                              type="text"
+                              ref={editRef}
+                              className="column-title-input"
+                              value={editingColumnTitle}
+                              onChange={(e) => setEditingColumnTitle(e.target.value)}
+                              onBlur={() => {
+                                const newTitle = editingColumnTitle.trim();
+                                if (newTitle && newTitle !== (col.title || '')) {
+                                  handleUpdateColumnTitle(newTitle);
+                                } else {
+                                  cancelEditingColumn();
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                e.stopPropagation();
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const newTitle = editingColumnTitle.trim();
+                                  if (newTitle) {
+                                    handleUpdateColumnTitle(newTitle);
+                                  }
+                                } else if (e.key === 'Escape') {
+                                  e.preventDefault();
+                                  cancelEditingColumn();
+                                }
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          ) : (
+                            col.title || 'Untitled Column'
+                          )}
+                        </div>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => isEmpty && handleDeleteColumn(col._id)}
+                          disabled={!isEmpty || isDeletingColumn === col._id}
+                          style={{
+                            opacity: isDeletingColumn === col._id ? 0.7 : isEmpty ? 0.7 : 0.3,
+                            cursor: isEmpty ? 'pointer' : 'not-allowed'
+                          }}
+                          title={isEmpty ? 'Delete column' : 'Cannot delete: Column contains cards'}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="3,6 5,6 21,6"/>
+                            <path d="M19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"/>
+                          </svg>
+                        </button>
+                      </div>
+                      
+                      <div className="column-cards">
+                        {columnCards
+                          .sort((a, b) => a.position - b.position)
+                          .map((card, index) => (
+                            <Draggable draggableId={card._id} index={index} key={card._id}>
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  className={`card ${snapshot.isDragging ? 'dragging' : ''}`}
+                                  onClick={() => handleCardClick(card)}
+                                >
+                                  <div className="card-title">{card.title}</div>
+                                  {card.description && (
+                                    <div className="card-description">{card.description}</div>
+                                  )}
+                                </div>
+                              )}
+                            </Draggable>
+                          ))}
+                        {provided.placeholder}
+                      </div>
+                      
+                      <div className="column-footer">
+                        <button
+                          className="add-button"
+                          onClick={() => openAddCardModal(col._id)}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                          </svg>
+                          <span>Add Card</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </Droppable>
+              );
+            })}
+            
+            <button
+              className="add-column-button"
+              onClick={openAddColumnModal}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              <span>Add Column</span>
+            </button>
+          </div>
+        </DragDropContext>
+      </main>
+
+      {/* Add Card Modal */}
+      {showAddCardModal && (
+        <div className="modal-backdrop" onClick={closeAddCardModal}>
+          <div className="modal fade-in" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Add Card</h2>
+            </div>
+            <form onSubmit={handleAddCard}>
+              <div className="modal-body">
+                <div style={{ marginBottom: 'var(--space-4)' }}>
+                  <label htmlFor="card-title" style={{ 
+                    display: 'block', 
+                    marginBottom: 'var(--space-2)', 
+                    fontSize: 'var(--font-size-sm)', 
+                    fontWeight: '500',
+                    color: 'var(--color-gray-700)'
+                  }}>
+                    Title
+                  </label>
+                  <input
+                    id="card-title"
+                    type="text"
+                    className="input"
+                    placeholder="Enter card title"
+                    value={newCardTitle}
+                    onChange={e => setNewCardTitle(e.target.value)}
+                    required
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label htmlFor="card-description" style={{ 
+                    display: 'block', 
+                    marginBottom: 'var(--space-2)', 
+                    fontSize: 'var(--font-size-sm)', 
+                    fontWeight: '500',
+                    color: 'var(--color-gray-700)'
+                  }}>
+                    Description (optional)
+                  </label>
+                  <textarea
+                    id="card-description"
+                    className="textarea"
+                    placeholder="Enter card description"
+                    value={newCardDescription}
+                    onChange={e => setNewCardDescription(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={closeAddCardModal}>
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary" 
+                  disabled={isSubmitting || !newCardTitle.trim()}
+                >
+                  {isSubmitting ? 'Adding...' : 'Add Card'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Column Modal */}
+      {showAddColumnModal && (
+        <div className="modal-backdrop" onClick={closeAddColumnModal}>
+          <div className="modal fade-in" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Add Column</h2>
+            </div>
+            <form onSubmit={handleAddColumn}>
+              <div className="modal-body">
+                <div>
+                  <label htmlFor="column-title" style={{ 
+                    display: 'block', 
+                    marginBottom: 'var(--space-2)', 
+                    fontSize: 'var(--font-size-sm)', 
+                    fontWeight: '500',
+                    color: 'var(--color-gray-700)'
+                  }}>
+                    Column Title
+                  </label>
+                  <input
+                    id="column-title"
+                    type="text"
+                    className="input"
+                    placeholder="Enter column title"
+                    value={newColumnName}
+                    onChange={e => setNewColumnName(e.target.value)}
+                    required
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={closeAddColumnModal}>
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary" 
+                  disabled={isSubmittingColumn || !newColumnName.trim()}
+                >
+                  {isSubmittingColumn ? 'Adding...' : 'Add Column'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Card Detail Modal */}
+      {selectedCard && (
+        <div className="modal-backdrop" onClick={closeCardModal}>
+          <div className="modal fade-in" onClick={e => e.stopPropagation()}>
+            {isEditingCard ? (
+              <form onSubmit={handleEditCard}>
+                <div className="modal-header">
+                  <h2>Edit Card</h2>
+                </div>
+                <div className="modal-body">
+                  <div style={{ marginBottom: 'var(--space-4)' }}>
+                    <label htmlFor="edit-card-title" style={{ 
+                      display: 'block', 
+                      marginBottom: 'var(--space-2)', 
+                      fontSize: 'var(--font-size-sm)', 
+                      fontWeight: '500',
+                      color: 'var(--color-gray-700)'
+                    }}>
+                      Title
+                    </label>
+                    <input
+                      id="edit-card-title"
+                      type="text"
+                      className="input"
+                      placeholder="Enter card title"
+                      value={editedCardTitle}
+                      onChange={e => setEditedCardTitle(e.target.value)}
+                      required
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="edit-card-description" style={{ 
+                      display: 'block', 
+                      marginBottom: 'var(--space-2)', 
+                      fontSize: 'var(--font-size-sm)', 
+                      fontWeight: '500',
+                      color: 'var(--color-gray-700)'
+                    }}>
+                      Description
+                    </label>
+                    <textarea
+                      id="edit-card-description"
+                      className="textarea"
+                      placeholder="Enter card description"
+                      value={editedCardDescription}
+                      onChange={e => setEditedCardDescription(e.target.value)}
+                    />
+                  </div>
+                  {cardError && (
+                    <div style={{ 
+                      marginTop: 'var(--space-3)', 
+                      padding: 'var(--space-2) var(--space-3)', 
+                      backgroundColor: '#fef2f2', 
+                      color: 'var(--color-error)', 
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: 'var(--font-size-sm)'
+                    }}>
+                      {cardError}
+                    </div>
+                  )}
+                </div>
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-secondary" onClick={closeCardModal}>
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary" 
                     disabled={isSubmitting || !editedCardTitle.trim()}
-                    style={{ background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.5rem 1rem', cursor: 'pointer', fontWeight: 600 }}
                   >
                     {isSubmitting ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
-                {cardError && (
-                  <p style={{ color: '#dc3545' }}>{cardError}</p>
-                )}
               </form>
             ) : (
               <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                  <h2 style={{ margin: 0 }}>{selectedCard.title}</h2>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button
-                    onClick={() => setIsEditingCard(true)}
-                    style={{ background: '#eee', border: 'none', borderRadius: '4px', padding: '0.5rem', cursor: 'pointer' }}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleDeleteCard}
-                    disabled={isDeletingCard}
-                    style={{
-                      background: '#dc3545',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '4px',
-                      padding: '0.5rem',
-                      cursor: 'pointer',
-                      opacity: isDeletingCard ? 0.7 : 1
-                    }}
-                  >
-                    {isDeletingCard ? 'Deleting...' : 'Delete'}
-                  </button>
+                <div className="modal-header">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <h2>{selectedCard.title}</h2>
+                    <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => setIsEditingCard(true)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={handleDeleteCard}
+                        disabled={isDeletingCard}
+                      >
+                        {isDeletingCard ? 'Deleting...' : 'Delete'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              {cardError && (
-                <p style={{ color: '#dc3545', marginTop: '0.5rem' }}>{cardError}</p>
-              )}
-              {selectedCard.description && (
-                  <p style={{ margin: '1rem 0', whiteSpace: 'pre-wrap' }}>{selectedCard.description}</p>
-                )}
-                <div style={{ marginTop: '1rem', color: '#666', fontSize: '0.9rem' }}>
-                  <p>Created: {new Date(selectedCard.createdAt || '').toLocaleString('en-GB', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}</p>
-                  {selectedCard.updatedAt && (
-                    <p>Last updated: {new Date(selectedCard.updatedAt).toLocaleString('en-GB', {
+                <div className="modal-body">
+                  {cardError && (
+                    <div style={{ 
+                      marginBottom: 'var(--space-4)', 
+                      padding: 'var(--space-2) var(--space-3)', 
+                      backgroundColor: '#fef2f2', 
+                      color: 'var(--color-error)', 
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: 'var(--font-size-sm)'
+                    }}>
+                      {cardError}
+                    </div>
+                  )}
+                  {selectedCard.description && (
+                    <div style={{ marginBottom: 'var(--space-4)' }}>
+                      <div className="card-description" style={{ whiteSpace: 'pre-wrap' }}>
+                        {selectedCard.description}
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ 
+                    color: 'var(--color-gray-500)', 
+                    fontSize: 'var(--font-size-xs)',
+                    lineHeight: 'var(--line-height-relaxed)'
+                  }}>
+                    <div>Created: {new Date(selectedCard.createdAt || '').toLocaleString('en-GB', {
                       day: 'numeric',
                       month: 'short',
                       year: 'numeric',
                       hour: '2-digit',
                       minute: '2-digit'
-                    })}</p>
-                  )}
+                    })}</div>
+                    {selectedCard.updatedAt && (
+                      <div>Last updated: {new Date(selectedCard.updatedAt).toLocaleString('en-GB', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}</div>
+                    )}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                  <button
-                    onClick={closeCardModal}
-                    style={{ background: '#eee', border: 'none', borderRadius: '4px', padding: '0.5rem 1rem', cursor: 'pointer' }}
-                  >
+                <div className="modal-footer">
+                  <button className="btn btn-secondary" onClick={closeCardModal}>
                     Close
                   </button>
                 </div>
@@ -1316,89 +1238,52 @@ const BoardView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Delete Board Modal */}
       {showDeleteBoardModal && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            background: 'rgba(0,0,0,0.2)',
-            backdropFilter: 'blur(2px)',
-            zIndex: 1000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-          onClick={() => setShowDeleteBoardModal(false)}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              background: '#fff',
-              borderRadius: '8px',
-              boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
-              padding: '2rem',
-              minWidth: '400px',
-              maxWidth: '500px',
-              width: '90%',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
-              <div style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '50%',
-                background: '#fef2f2',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: '1rem'
-              }}>
-                <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
+        <div className="modal-backdrop" onClick={() => setShowDeleteBoardModal(false)}>
+          <div className="modal fade-in" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  backgroundColor: '#fef2f2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                  </svg>
+                </div>
+                <h2>Delete Board</h2>
               </div>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600' }}>Delete Board</h2>
             </div>
-            
-            <p style={{ marginBottom: '1.5rem', color: '#6b7280', lineHeight: '1.5' }}>
-              Are you sure you want to delete "<strong>{board?.title}</strong>"? This action cannot be undone and will permanently remove the board and all its cards.
-            </p>
-            
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+            <div className="modal-body">
+              <p style={{ 
+                color: 'var(--color-gray-600)', 
+                lineHeight: 'var(--line-height-relaxed)',
+                marginBottom: 'var(--space-4)'
+              }}>
+                Are you sure you want to delete "<strong>{board?.title}</strong>"? This action cannot be undone and will permanently remove the board and all its cards.
+              </p>
+            </div>
+            <div className="modal-footer">
               <button
-                type="button"
+                className="btn btn-secondary"
                 onClick={() => setShowDeleteBoardModal(false)}
                 disabled={isDeletingBoard}
-                style={{
-                  background: '#f3f4f6',
-                  color: '#374151',
-                  border: 'none',
-                  borderRadius: '6px',
-                  padding: '0.75rem 1.5rem',
-                  cursor: 'pointer',
-                  fontWeight: '500',
-                  opacity: isDeletingBoard ? 0.5 : 1
-                }}
               >
                 Cancel
               </button>
               <button
-                type="button"
+                className="btn btn-danger"
                 onClick={handleDeleteBoard}
                 disabled={isDeletingBoard}
-                style={{
-                  background: '#dc2626',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  padding: '0.75rem 1.5rem',
-                  cursor: 'pointer',
-                  fontWeight: '500',
-                  opacity: isDeletingBoard ? 0.7 : 1
-                }}
               >
                 {isDeletingBoard ? 'Deleting...' : 'Delete Board'}
               </button>

@@ -37,114 +37,73 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// POST /api/boards - Create a new board
-router.post('/', auth, async (req, res) => {
+// GET /api/boards/:boardId/collaborators - Get board collaborators
+router.get('/:boardId/collaborators', auth, async (req, res) => {
+  console.log('=== COLLABORATORS ROUTE CALLED ===');
+  console.log('URL:', req.url);
+  console.log('Method:', req.method);
+  console.log('Params:', req.params);
+  
   try {
-    const { title, columns, sampleCards } = req.body;
-    console.log('Creating board with data:', { title, columns, sampleCards, owner: req.user._id });
+    const { boardId } = req.params;
 
-    // Convert columns with 'name' to 'title' for backward compatibility
-    let safeColumns = columns;
-    if (Array.isArray(columns)) {
-      safeColumns = columns.map(col => {
-        if (col && col.name && !col.title) {
-          return { ...col, title: col.name, name: undefined };
-        }
-        return col;
-      });
+    // Get the board
+    const board = await Board.findById(boardId);
+
+    if (!board) {
+      return res.status(404).json({ error: 'Board not found' });
     }
 
-    // Generate slug from title
-    const generateSlug = (title) => {
-      return title
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '');
+    // Check if user has access
+    const hasAccess = board.owner.toString() === req.user._id.toString() || 
+                     board.sharedWith.some(id => id.toString() === req.user._id.toString());
+    
+    if (!hasAccess) {
+      return res.status(404).json({ error: 'Board not found or unauthorized' });
+    }
+
+    // Get owner information
+    const owner = await User.findById(board.owner).select('username firstName lastName email');
+
+    if (!owner) {
+      console.error('Owner not found for board:', boardId);
+      return res.status(500).json({ error: 'Owner information not found' });
+    }
+
+    // Get all shared users
+    const sharedUsers = await User.find({ _id: { $in: board.sharedWith } }).select('username firstName lastName email');
+
+    const response = {
+      owner: {
+        _id: owner._id,
+        username: owner.username,
+        firstName: owner.firstName,
+        lastName: owner.lastName,
+        email: owner.email
+      },
+      collaborators: sharedUsers.map(user => ({
+        _id: user._id,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email
+      }))
     };
 
-    const baseSlug = generateSlug(title);
-    let slug = baseSlug;
-    let counter = 1;
-    
-    // Check if slug already exists and make it unique
-    while (await Board.findOne({ ownerUsername: req.user.username, slug })) {
-      slug = `${baseSlug}-${counter}`;
-      counter++;
-    }
-
-    // Create sample cards if requested
-    let cards = [];
-    if (sampleCards) {
-      const todoColumnId = new mongoose.Types.ObjectId();
-      const inProgressColumnId = new mongoose.Types.ObjectId();
-      const doneColumnId = new mongoose.Types.ObjectId();
-
-      // Update column IDs to use the actual IDs
-      if (safeColumns && safeColumns.length >= 3) {
-        safeColumns[0]._id = todoColumnId;
-        safeColumns[1]._id = inProgressColumnId;
-        safeColumns[2]._id = doneColumnId;
-      }
-
-      cards = [
-        {
-          _id: new mongoose.Types.ObjectId(),
-          columnId: todoColumnId.toString(),
-          title: 'Welcome to your sample board! 🎉',
-          description: 'This is your first card. Click on it to edit or drag it between columns.',
-          position: 0
-        },
-        {
-          _id: new mongoose.Types.ObjectId(),
-          columnId: todoColumnId.toString(),
-          title: 'Create your own cards',
-          description: 'Click the "+" button in any column to add new cards.',
-          position: 1
-        },
-        {
-          _id: new mongoose.Types.ObjectId(),
-          columnId: inProgressColumnId.toString(),
-          title: 'Drag and drop cards',
-          description: 'Try dragging this card to another column to see it in action!',
-          position: 0
-        },
-        {
-          _id: new mongoose.Types.ObjectId(),
-          columnId: doneColumnId.toString(),
-          title: 'Collaborate with others',
-          description: 'Share your boards with team members for real-time collaboration.',
-          position: 0
-        }
-      ];
-    }
-
-    const board = new Board({
-      title,
-      slug,
-      owner: req.user._id,
-      ownerUsername: req.user.username,
-      columns: safeColumns || [
-        { _id: new mongoose.Types.ObjectId(), title: 'To Do', position: 0 },
-        { _id: new mongoose.Types.ObjectId(), title: 'In Progress', position: 1 },
-        { _id: new mongoose.Types.ObjectId(), title: 'Done', position: 2 },
-      ],
-      cards: cards,
-    });
-
-    const saved = await board.save();
-    console.log('Created board:', saved);
-    res.json({ board: saved });
+    res.json(response);
   } catch (err) {
-    console.error('Error creating board:', err);
-    if (err.code === 11000) {
-      return res.status(400).json({ error: 'A board with this name already exists' });
-    }
-    res.status(400).json({ error: 'Failed to create board' });
+    console.error('Error fetching collaborators:', err);
+    res.status(500).json({ error: 'Failed to fetch collaborators' });
   }
 });
 
 // GET /api/boards/:username/:slug - Get a board by username and slug
 router.get('/:username/:slug', auth, async (req, res) => {
+  console.log('=== USERNAME/SLUG ROUTE CALLED ===');
+  console.log('URL:', req.url);
+  console.log('Method:', req.method);
+  console.log('Params:', req.params);
+  
   try {
     const { username, slug } = req.params;
     console.log('Fetching board:', { username, slug, userId: req.user._id });
@@ -270,8 +229,12 @@ router.post('/:boardId/share', auth, async (req, res) => {
     board.sharedWith.push(userToShare._id);
     await board.save();
 
-    console.log('Board saved with new sharedWith:', {
-      newSharedWith: board.sharedWith.map(id => id.toString())
+    // Verify the save worked by fetching the board again
+    const savedBoard = await Board.findById(boardId);
+    console.log('Board after save:', {
+      boardId: savedBoard._id,
+      sharedWith: savedBoard.sharedWith,
+      sharedWithLength: savedBoard.sharedWith.length
     });
 
     // Emit socket event for real-time updates
@@ -294,48 +257,6 @@ router.post('/:boardId/share', auth, async (req, res) => {
   } catch (err) {
     console.error('Error sharing board:', err);
     res.status(500).json({ error: 'Failed to share board' });
-  }
-});
-
-// GET /api/boards/:boardId/collaborators - Get board collaborators
-router.get('/:boardId/collaborators', auth, async (req, res) => {
-  try {
-    const { boardId } = req.params;
-
-    const board = await Board.findOne({
-      _id: boardId,
-      $or: [
-        { owner: req.user._id },
-        { sharedWith: { $in: [req.user._id] } }
-      ]
-    }).populate('sharedWith', 'username firstName lastName email');
-
-    if (!board) {
-      return res.status(404).json({ error: 'Board not found or unauthorized' });
-    }
-
-    // Get owner information
-    const owner = await User.findById(board.owner).select('username firstName lastName email');
-
-    res.json({
-      owner: {
-        _id: owner._id,
-        username: owner.username,
-        firstName: owner.firstName,
-        lastName: owner.lastName,
-        email: owner.email
-      },
-      collaborators: board.sharedWith.map(user => ({
-        _id: user._id,
-        username: user.username,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email
-      }))
-    });
-  } catch (err) {
-    console.error('Error fetching collaborators:', err);
-    res.status(500).json({ error: 'Failed to fetch collaborators' });
   }
 });
 
@@ -485,7 +406,10 @@ router.put('/:boardId', auth, async (req, res) => {
   try {
     const board = await Board.findOne({
       _id: req.params.boardId,
-      owner: req.user._id
+      $or: [
+        { owner: req.user._id },
+        { sharedWith: { $in: [req.user._id] } }
+      ]
     });
 
     if (!board) {
@@ -532,7 +456,10 @@ router.post('/:boardId/columns', auth, async (req, res) => {
 
     const board = await Board.findOne({
       _id: boardId,
-      owner: req.user._id
+      $or: [
+        { owner: req.user._id },
+        { sharedWith: { $in: [req.user._id] } }
+      ]
     });
 
     if (!board) {
@@ -568,11 +495,14 @@ router.delete('/:boardId/columns/:columnId', auth, async (req, res) => {
 
     const board = await Board.findOne({
       _id: boardId,
-      owner: req.user._id
+      $or: [
+        { owner: req.user._id },
+        { sharedWith: { $in: [req.user._id] } }
+      ]
     });
 
     if (!board) {
-      return res.status(404).json({ error: 'Board not found' });
+      return res.status(404).json({ error: 'Board not found or unauthorized' });
     }
 
     const hasCards = board.cards.some(card => card.columnId.toString() === columnId);
@@ -609,7 +539,10 @@ router.put('/:boardId/columns/:columnId', auth, async (req, res) => {
 
     const board = await Board.findOne({
       _id: boardId,
-      owner: req.user._id
+      $or: [
+        { owner: req.user._id },
+        { sharedWith: { $in: [req.user._id] } }
+      ]
     });
 
     if (!board) {
@@ -685,6 +618,112 @@ router.delete('/:boardId/star', auth, async (req, res) => {
   } catch (err) {
     console.error('Error unstarring board:', err);
     res.status(400).json({ error: 'Failed to unstar board' });
+  }
+});
+
+// POST /api/boards - Create a new board
+router.post('/', auth, async (req, res) => {
+  try {
+    const { title, columns, sampleCards } = req.body;
+    console.log('Creating board with data:', { title, columns, sampleCards, owner: req.user._id });
+
+    // Convert columns with 'name' to 'title' for backward compatibility
+    let safeColumns = columns;
+    if (Array.isArray(columns)) {
+      safeColumns = columns.map(col => {
+        if (col && col.name && !col.title) {
+          return { ...col, title: col.name, name: undefined };
+        }
+        return col;
+      });
+    }
+
+    // Generate slug from title
+    const generateSlug = (title) => {
+      return title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+    };
+
+    const baseSlug = generateSlug(title);
+    let slug = baseSlug;
+    let counter = 1;
+    
+    // Check if slug already exists and make it unique
+    while (await Board.findOne({ ownerUsername: req.user.username, slug })) {
+      slug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+
+    // Create sample cards if requested
+    let cards = [];
+    if (sampleCards) {
+      const todoColumnId = new mongoose.Types.ObjectId();
+      const inProgressColumnId = new mongoose.Types.ObjectId();
+      const doneColumnId = new mongoose.Types.ObjectId();
+
+      // Update column IDs to use the actual IDs
+      if (safeColumns && safeColumns.length >= 3) {
+        safeColumns[0]._id = todoColumnId;
+        safeColumns[1]._id = inProgressColumnId;
+        safeColumns[2]._id = doneColumnId;
+      }
+
+      cards = [
+        {
+          _id: new mongoose.Types.ObjectId(),
+          columnId: todoColumnId.toString(),
+          title: 'Welcome to your sample board! 🎉',
+          description: 'This is your first card. Click on it to edit or drag it between columns.',
+          position: 0
+        },
+        {
+          _id: new mongoose.Types.ObjectId(),
+          columnId: todoColumnId.toString(),
+          title: 'Create your own cards',
+          description: 'Click the "+" button in any column to add new cards.',
+          position: 1
+        },
+        {
+          _id: new mongoose.Types.ObjectId(),
+          columnId: inProgressColumnId.toString(),
+          title: 'Drag and drop cards',
+          description: 'Try dragging this card to another column to see it in action!',
+          position: 0
+        },
+        {
+          _id: new mongoose.Types.ObjectId(),
+          columnId: doneColumnId.toString(),
+          title: 'Collaborate with others',
+          description: 'Share your boards with team members for real-time collaboration.',
+          position: 0
+        }
+      ];
+    }
+
+    const board = new Board({
+      title,
+      slug,
+      owner: req.user._id,
+      ownerUsername: req.user.username,
+      columns: safeColumns || [
+        { _id: new mongoose.Types.ObjectId(), title: 'To Do', position: 0 },
+        { _id: new mongoose.Types.ObjectId(), title: 'In Progress', position: 1 },
+        { _id: new mongoose.Types.ObjectId(), title: 'Done', position: 2 },
+      ],
+      cards: cards,
+    });
+
+    const saved = await board.save();
+    console.log('Created board:', saved);
+    res.json({ board: saved });
+  } catch (err) {
+    console.error('Error creating board:', err);
+    if (err.code === 11000) {
+      return res.status(400).json({ error: 'A board with this name already exists' });
+    }
+    res.status(400).json({ error: 'Failed to create board' });
   }
 });
 

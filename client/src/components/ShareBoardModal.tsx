@@ -45,7 +45,7 @@ const ShareBoardModal: React.FC<ShareBoardModalProps> = ({
       
       const data = await response.json();
       setOwner(data.owner);
-      setCollaborators(data.collaborators);
+      setCollaborators(data.collaborators || []);
     } catch (error) {
       console.error('Error fetching collaborators:', error);
     } finally {
@@ -127,144 +127,259 @@ const ShareBoardModal: React.FC<ShareBoardModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 max-h-[90vh] overflow-hidden">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-semibold text-gray-900">Share Board</h3>
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal fade-in" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2>Share Board</h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="btn btn-ghost btn-sm"
+              style={{ padding: 'var(--space-1)' }}
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 6L6 18M6 6l12 12"/>
               </svg>
             </button>
           </div>
+        </div>
 
-          <div className="mb-6">
-            <h4 className="font-medium text-gray-900 mb-2">{boardTitle}</h4>
-            <p className="text-sm text-gray-600">Share this board with team members to collaborate in real-time.</p>
+        <div className="modal-body">
+          <div style={{ marginBottom: 'var(--space-6)' }}>
+            <h4 style={{ 
+              fontSize: 'var(--font-size-base)', 
+              fontWeight: '600', 
+              color: 'var(--color-gray-900)',
+              marginBottom: 'var(--space-2)'
+            }}>
+              {boardTitle}
+            </h4>
+            <p style={{ 
+              fontSize: 'var(--font-size-sm)', 
+              color: 'var(--color-gray-600)',
+              lineHeight: 'var(--line-height-relaxed)'
+            }}>
+              Share this board with team members to collaborate in real-time.
+            </p>
           </div>
 
           {/* Share Form */}
           {isOwner && (
-            <form onSubmit={handleShare} className="mb-6">
-              <div className="flex gap-2">
+            <form onSubmit={handleShare} style={{ marginBottom: 'var(--space-6)' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
                 <input
                   type="text"
                   value={shareInput}
                   onChange={(e) => setShareInput(e.target.value)}
                   placeholder="Enter username or email"
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="input"
+                  style={{ flex: 1 }}
                   disabled={isSharing}
                 />
                 <button
                   type="submit"
+                  className="btn btn-primary"
                   disabled={!shareInput.trim() || isSharing}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isSharing ? 'Sharing...' : 'Share'}
                 </button>
               </div>
               
-              <p className="text-xs text-gray-500 mt-2">
+              <p style={{ 
+                fontSize: 'var(--font-size-xs)', 
+                color: 'var(--color-gray-500)',
+                marginBottom: 'var(--space-3)'
+              }}>
                 Enter a username (e.g., "john") or email address (e.g., "john@example.com")
               </p>
               
               {shareError && (
-                <p className="text-red-500 text-sm mt-2">{shareError}</p>
+                <div style={{ 
+                  padding: 'var(--space-2) var(--space-3)', 
+                  backgroundColor: '#fef2f2', 
+                  color: 'var(--color-error)', 
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: 'var(--font-size-sm)',
+                  marginBottom: 'var(--space-3)'
+                }}>
+                  {shareError}
+                </div>
               )}
               
               {shareSuccess && (
-                <p className="text-green-600 text-sm mt-2">{shareSuccess}</p>
+                <div style={{ 
+                  padding: 'var(--space-2) var(--space-3)', 
+                  backgroundColor: '#f0fdf4', 
+                  color: 'var(--color-success)', 
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: 'var(--font-size-sm)',
+                  marginBottom: 'var(--space-3)'
+                }}>
+                  {shareSuccess}
+                </div>
               )}
             </form>
           )}
 
           {/* Collaborators List */}
-          <div className="space-y-4">
-            <h4 className="font-medium text-gray-900">People with access</h4>
+          <div>
+            <h4 style={{ 
+              fontSize: 'var(--font-size-base)', 
+              fontWeight: '600', 
+              color: 'var(--color-gray-900)',
+              marginBottom: 'var(--space-4)'
+            }}>
+              People with access
+            </h4>
             
             {isLoadingCollaborators ? (
-              <div className="flex items-center justify-center py-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                padding: 'var(--space-4)' 
+              }}>
+                <div style={{
+                  width: '24px',
+                  height: '24px',
+                  border: '2px solid var(--color-gray-200)',
+                  borderTop: '2px solid var(--color-blue-500)',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite'
+                }}></div>
               </div>
             ) : (
-              <div className="space-y-3 max-h-64 overflow-y-auto">
+              <div style={{ 
+                maxHeight: '256px', 
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--space-3)'
+              }}>
                 {/* Owner */}
                 {owner && (
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-                        <span className="text-white text-sm font-semibold">
-                          {owner.firstName?.[0]}{owner.lastName?.[0]}
-                        </span>
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between',
+                    padding: 'var(--space-3)',
+                    backgroundColor: 'var(--color-gray-50)',
+                    borderRadius: 'var(--radius-lg)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        background: 'linear-gradient(135deg, var(--color-blue-500), var(--color-blue-600))',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'var(--color-white)',
+                        fontSize: 'var(--font-size-sm)',
+                        fontWeight: '600'
+                      }}>
+                        <span>{owner.firstName?.[0]}{owner.lastName?.[0]}</span>
                       </div>
                       <div>
-                        <p className="font-medium text-gray-900">
+                        <div style={{ 
+                          fontSize: 'var(--font-size-sm)', 
+                          fontWeight: '500', 
+                          color: 'var(--color-gray-900)' 
+                        }}>
                           {owner.firstName} {owner.lastName}
-                        </p>
-                        <p className="text-sm text-gray-500">@{owner.username} • Owner</p>
+                        </div>
+                        <div style={{ 
+                          fontSize: 'var(--font-size-xs)', 
+                          color: 'var(--color-gray-500)' 
+                        }}>
+                          @{owner.username}
+                        </div>
                       </div>
+                    </div>
+                    <div style={{
+                      padding: 'var(--space-1) var(--space-2)',
+                      backgroundColor: 'var(--color-blue-50)',
+                      color: 'var(--color-blue-600)',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: 'var(--font-size-xs)',
+                      fontWeight: '500'
+                    }}>
+                      Owner
                     </div>
                   </div>
                 )}
 
                 {/* Collaborators */}
-                {collaborators.map((collaborator) => (
-                  <div key={collaborator._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-green-600 rounded-full flex items-center justify-center">
-                        <span className="text-white text-sm font-semibold">
-                          {collaborator.firstName?.[0]}{collaborator.lastName?.[0]}
-                        </span>
+                {collaborators.length > 0 ? (
+                  collaborators.map((collaborator) => (
+                    <div key={collaborator._id} style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between',
+                      padding: 'var(--space-3)',
+                      backgroundColor: 'var(--color-white)',
+                      border: '1px solid var(--color-gray-200)',
+                      borderRadius: 'var(--radius-lg)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                        <div style={{
+                          width: '32px',
+                          height: '32px',
+                          background: 'linear-gradient(135deg, var(--color-gray-500), var(--color-gray-600))',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'var(--color-white)',
+                          fontSize: 'var(--font-size-sm)',
+                          fontWeight: '600'
+                        }}>
+                          <span>{collaborator.firstName?.[0]}{collaborator.lastName?.[0]}</span>
+                        </div>
+                        <div>
+                          <div style={{ 
+                            fontSize: 'var(--font-size-sm)', 
+                            fontWeight: '500', 
+                            color: 'var(--color-gray-900)' 
+                          }}>
+                            {collaborator.firstName} {collaborator.lastName}
+                          </div>
+                          <div style={{ 
+                            fontSize: 'var(--font-size-xs)', 
+                            color: 'var(--color-gray-500)' 
+                          }}>
+                            @{collaborator.username}
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {collaborator.firstName} {collaborator.lastName}
-                        </p>
-                        <p className="text-sm text-gray-500">@{collaborator.username} • Collaborator</p>
-                      </div>
+                      {isOwner && (
+                        <button
+                          onClick={() => handleRemoveCollaborator(collaborator._id, collaborator.username)}
+                          disabled={isRemoving === collaborator._id}
+                          className="btn btn-ghost btn-sm"
+                          style={{ 
+                            color: 'var(--color-error)',
+                            opacity: isRemoving === collaborator._id ? 0.5 : 1
+                          }}
+                        >
+                          {isRemoving === collaborator._id ? 'Removing...' : 'Remove'}
+                        </button>
+                      )}
                     </div>
-                    {isOwner && (
-                      <button
-                        onClick={() => handleRemoveCollaborator(collaborator._id, collaborator.username)}
-                        disabled={isRemoving === collaborator._id}
-                        className="text-red-500 hover:text-red-700 transition-colors disabled:opacity-50"
-                        title="Remove collaborator"
-                      >
-                        {isRemoving === collaborator._id ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-500"></div>
-                        ) : (
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        )}
-                      </button>
-                    )}
-                  </div>
-                ))}
-
-                {collaborators.length === 0 && (
-                  <div className="text-center py-4 text-gray-500">
-                    <p className="text-sm">No collaborators yet</p>
-                    {!isOwner && (
-                      <p className="text-xs mt-1">Only the owner can add collaborators</p>
-                    )}
+                  ))
+                ) : (
+                  <div style={{ 
+                    textAlign: 'center', 
+                    padding: 'var(--space-6)', 
+                    color: 'var(--color-gray-500)',
+                    fontSize: 'var(--font-size-sm)'
+                  }}>
+                    No collaborators yet
                   </div>
                 )}
               </div>
             )}
-          </div>
-
-          {/* Footer */}
-          <div className="mt-6 pt-4 border-t border-gray-200">
-            <div className="text-xs text-gray-500">
-              <p>• Collaborators can view and edit all cards</p>
-              <p>• Only the owner can add/remove collaborators</p>
-              <p>• Changes sync in real-time for all users</p>
-            </div>
           </div>
         </div>
       </div>
