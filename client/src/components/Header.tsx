@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { getAvatarColor, getInitials } from '../utils/avatarColors';
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
@@ -8,12 +9,9 @@ const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Get user initials
-  const getInitials = () => {
-    if (!user) return '';
-    const { firstName, lastName } = user;
-    return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
-  };
+  // Get avatar color based on user ID
+  const avatarColor = getAvatarColor(user?.id || user?.username || '');
+  const initials = getInitials(user?.firstName, user?.lastName);
 
   // Get full name
   const getFullName = () => {
@@ -53,8 +51,8 @@ const Header: React.FC = () => {
             width: '32px',
             height: '32px',
             borderRadius: '50%',
-            backgroundColor: '#2563eb',
-            color: 'white',
+            backgroundColor: avatarColor.bg,
+            color: avatarColor.text,
             border: 'none',
             cursor: 'pointer',
             display: 'flex',
@@ -67,7 +65,7 @@ const Header: React.FC = () => {
           onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
           onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
         >
-          {getInitials()}
+          {initials}
         </button>
 
         {isMenuOpen && (

@@ -277,6 +277,7 @@ io.on('connection', (socket) => {
       // Update the card
       card.columnId = data.destinationColumnId;
       card.position = data.destinationIndex;
+      card.modifiedBy = socket.user._id;
 
       // Adjust positions of other cards when column or index changes
       if (data.destinationColumnId !== oldColumnId || data.destinationIndex !== oldPosition) {
@@ -300,6 +301,9 @@ io.on('connection', (socket) => {
       }
 
       await board.save();
+
+      // Populate the modifiedBy field for all cards
+      await board.populate('cards.modifiedBy', 'username firstName lastName');
 
       // Emit all updated cards to all clients in the room
       socket.to(data.boardId.toString()).emit('cardsUpdated', {

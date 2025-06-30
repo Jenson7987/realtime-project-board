@@ -5,7 +5,9 @@ const CardSchema = new mongoose.Schema({
   columnId: { type: String, required: true },
   title: { type: String, required: true },
   description: String,
-  position: { type: Number, required: true }
+  position: { type: Number, required: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  modifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 }, { timestamps: true });
 
 const ColumnSchema = new mongoose.Schema({

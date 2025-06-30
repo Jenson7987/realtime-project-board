@@ -21,6 +21,8 @@ router.get('/', auth, async (req, res) => {
       ]
     })
     .populate('owner', 'username email firstName lastName')
+    .populate('cards.createdBy', 'username firstName lastName')
+    .populate('cards.modifiedBy', 'username firstName lastName')
     .sort({ updatedAt: -1 }); // Sort by last modified, newest first
 
     // Add starred status to each board
@@ -115,7 +117,10 @@ router.get('/:username/:slug', auth, async (req, res) => {
         { owner: req.user._id },
         { sharedWith: { $in: [req.user._id] } }
       ]
-    }).populate('owner', 'username email firstName lastName');
+    })
+    .populate('owner', 'username email firstName lastName')
+    .populate('cards.createdBy', 'username firstName lastName')
+    .populate('cards.modifiedBy', 'username firstName lastName');
 
     console.log('Board query result:', {
       found: !!board,
@@ -129,6 +134,16 @@ router.get('/:username/:slug', auth, async (req, res) => {
     if (!board) {
       return res.status(404).json({ error: 'Board not found' });
     }
+
+    // Handle backward compatibility for cards without createdBy/modifiedBy fields
+    board.cards.forEach(card => {
+      if (!card.createdBy) {
+        card.createdBy = board.owner;
+      }
+      if (!card.modifiedBy) {
+        card.modifiedBy = board.owner;
+      }
+    });
 
     res.json({ board });
   } catch (err) {
@@ -146,7 +161,10 @@ router.get('/slug/:slug', auth, async (req, res) => {
         { owner: req.user._id },
         { sharedWith: { $in: [req.user._id] } }
       ]
-    }).populate('owner', 'username email firstName lastName');
+    })
+    .populate('owner', 'username email firstName lastName')
+    .populate('cards.createdBy', 'username firstName lastName')
+    .populate('cards.modifiedBy', 'username firstName lastName');
 
     if (!board) {
       return res.status(404).json({ error: 'Board not found' });
@@ -315,6 +333,16 @@ router.get('/:boardId', auth, async (req, res) => {
       return res.status(404).json({ error: 'Board not found' });
     }
 
+    // Handle backward compatibility for cards without createdBy/modifiedBy fields
+    board.cards.forEach(card => {
+      if (!card.createdBy) {
+        card.createdBy = board.owner;
+      }
+      if (!card.modifiedBy) {
+        card.modifiedBy = board.owner;
+      }
+    });
+
     res.json({ board });
   } catch (err) {
     console.error('Error fetching board:', err);
@@ -344,28 +372,36 @@ router.post('/create-default', auth, async (req, res) => {
         columnId: 'todo',
         title: 'Welcome to your first board! 🎉',
         description: 'This is your first card. Click on it to edit or drag it between columns.',
-        position: 0
+        position: 0,
+        createdBy: req.user._id,
+        modifiedBy: req.user._id
       },
       {
         _id: new mongoose.Types.ObjectId(),
         columnId: 'todo',
         title: 'Create your own cards',
         description: 'Click the "+" button in any column to add new cards.',
-        position: 1
+        position: 1,
+        createdBy: req.user._id,
+        modifiedBy: req.user._id
       },
       {
         _id: new mongoose.Types.ObjectId(),
         columnId: 'in-progress',
         title: 'Drag and drop cards',
         description: 'Try dragging this card to another column to see it in action!',
-        position: 0
+        position: 0,
+        createdBy: req.user._id,
+        modifiedBy: req.user._id
       },
       {
         _id: new mongoose.Types.ObjectId(),
         columnId: 'done',
         title: 'Collaborate with others',
         description: 'Share your boards with team members for real-time collaboration.',
-        position: 0
+        position: 0,
+        createdBy: req.user._id,
+        modifiedBy: req.user._id
       }
     ];
 
@@ -391,6 +427,8 @@ router.post('/create-default', auth, async (req, res) => {
       ],
       cards: sampleCards,
     });
+
+    console.log('Board object before save:', JSON.stringify(board, null, 2));
 
     const saved = await board.save();
     console.log('Created default board:', saved);
@@ -676,30 +714,44 @@ router.post('/', auth, async (req, res) => {
           columnId: todoColumnId.toString(),
           title: 'Welcome to your sample board! 🎉',
           description: 'This is your first card. Click on it to edit or drag it between columns.',
-          position: 0
+          position: 0,
+          createdBy: req.user._id,
+          modifiedBy: req.user._id
         },
         {
           _id: new mongoose.Types.ObjectId(),
           columnId: todoColumnId.toString(),
           title: 'Create your own cards',
           description: 'Click the "+" button in any column to add new cards.',
-          position: 1
+          position: 1,
+          createdBy: req.user._id,
+          modifiedBy: req.user._id
         },
         {
           _id: new mongoose.Types.ObjectId(),
           columnId: inProgressColumnId.toString(),
           title: 'Drag and drop cards',
           description: 'Try dragging this card to another column to see it in action!',
-          position: 0
+          position: 0,
+          createdBy: req.user._id,
+          modifiedBy: req.user._id
         },
         {
           _id: new mongoose.Types.ObjectId(),
           columnId: doneColumnId.toString(),
           title: 'Collaborate with others',
           description: 'Share your boards with team members for real-time collaboration.',
-          position: 0
+          position: 0,
+          createdBy: req.user._id,
+          modifiedBy: req.user._id
         }
       ];
+      
+      console.log('Sample cards created with user info:', cards.map(card => ({
+        title: card.title,
+        createdBy: card.createdBy,
+        modifiedBy: card.modifiedBy
+      })));
     }
 
     const board = new Board({
@@ -714,6 +766,8 @@ router.post('/', auth, async (req, res) => {
       ],
       cards: cards,
     });
+
+    console.log('Board object before save:', JSON.stringify(board, null, 2));
 
     const saved = await board.save();
     console.log('Created board:', saved);

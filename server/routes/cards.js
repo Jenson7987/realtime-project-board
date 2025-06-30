@@ -28,7 +28,9 @@ router.post('/', auth, async (req, res) => {
       columnId,
       title,
       description,
-      position
+      position,
+      createdBy: req.user._id,
+      modifiedBy: req.user._id
     };
 
     console.log('Adding card to board:', card);
@@ -41,17 +43,22 @@ router.post('/', auth, async (req, res) => {
     const createdCard = board.cards[board.cards.length - 1];
     console.log('Created card:', createdCard);
 
+    // Populate the createdBy and modifiedBy fields for the response
+    await board.populate('cards.createdBy', 'username firstName lastName');
+    await board.populate('cards.modifiedBy', 'username firstName lastName');
+    const populatedCard = board.cards[board.cards.length - 1];
+
     // Emit socket event for real-time updates
     console.log('Emitting cardCreated event to room:', boardId);
     const room = req.app.get('io').sockets.adapter.rooms.get(boardId.toString());
     console.log(`Number of clients in room ${boardId}:`, room ? room.size : 0);
     req.app.get('io').to(boardId.toString()).emit('cardCreated', {
       boardId: boardId.toString(),
-      card: createdCard
+      card: populatedCard
     });
     console.log('cardCreated event emitted successfully');
 
-    res.json(createdCard);
+    res.json(populatedCard);
   } catch (error) {
     console.error('Error creating card:', error);
     res.status(500).json({ error: 'Failed to create card', details: error.message });
@@ -86,6 +93,7 @@ router.put('/:boardId/:cardId', auth, async (req, res) => {
 
     if (title) card.title = title;
     if (description !== undefined) card.description = description;
+    card.modifiedBy = req.user._id;
 
     let newColumnId = oldColumnId;
     let newPosition = oldPosition;
@@ -118,15 +126,27 @@ router.put('/:boardId/:cardId', auth, async (req, res) => {
 
     await board.save();
 
+    // Populate both createdBy and modifiedBy fields for the response
+    await board.populate('cards.createdBy', 'username firstName lastName');
+    await board.populate('cards.modifiedBy', 'username firstName lastName');
+    const populatedCard = board.cards.id(cardId);
+
+    console.log('Updated card with populated fields:', {
+      _id: populatedCard._id,
+      title: populatedCard.title,
+      createdBy: populatedCard.createdBy,
+      modifiedBy: populatedCard.modifiedBy
+    });
+
     // Emit socket event for real-time updates
     console.log('Emitting cardUpdated event to room:', boardId);
     req.app.get('io').to(boardId.toString()).emit('cardUpdated', {
       boardId: boardId.toString(),
-      card
+      card: populatedCard
     });
     console.log('cardUpdated event emitted successfully');
 
-    res.json(card);
+    res.json(populatedCard);
   } catch (error) {
     console.error('Error updating card:', error);
     res.status(500).json({ error: 'Failed to update card' });

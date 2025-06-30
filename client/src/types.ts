@@ -6,6 +6,8 @@ export interface Card {
   position: number;
   createdAt: string;
   updatedAt: string;
+  createdBy: User;
+  modifiedBy: User;
 }
 
 export interface Column {

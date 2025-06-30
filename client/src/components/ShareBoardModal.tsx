@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../contexts/AuthContext';
 import { User } from '../types';
+import { getAvatarColor, getInitials } from '../utils/avatarColors';
 
 interface ShareBoardModalProps {
   boardId: string;
@@ -123,6 +124,17 @@ const ShareBoardModal: React.FC<ShareBoardModalProps> = ({
   };
 
   const isOwner = owner?._id === user?.id;
+
+  console.log('ShareBoardModal debug:', {
+    isOpen,
+    boardId,
+    boardTitle,
+    owner: owner?._id,
+    user: user?.id,
+    isOwner,
+    userExists: !!user,
+    ownerExists: !!owner
+  });
 
   if (!isOpen) return null;
 
@@ -270,16 +282,16 @@ const ShareBoardModal: React.FC<ShareBoardModalProps> = ({
                       <div style={{
                         width: '32px',
                         height: '32px',
-                        background: 'linear-gradient(135deg, var(--color-blue-500), var(--color-blue-600))',
+                        background: getAvatarColor(owner._id).bg,
+                        color: getAvatarColor(owner._id).text,
                         borderRadius: '50%',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: 'var(--color-white)',
                         fontSize: 'var(--font-size-sm)',
                         fontWeight: '600'
                       }}>
-                        <span>{owner.firstName?.[0]}{owner.lastName?.[0]}</span>
+                        <span>{getInitials(owner.firstName, owner.lastName)}</span>
                       </div>
                       <div>
                         <div style={{ 
@@ -326,16 +338,16 @@ const ShareBoardModal: React.FC<ShareBoardModalProps> = ({
                         <div style={{
                           width: '32px',
                           height: '32px',
-                          background: 'linear-gradient(135deg, var(--color-gray-500), var(--color-gray-600))',
+                          background: getAvatarColor(collaborator._id).bg,
+                          color: getAvatarColor(collaborator._id).text,
                           borderRadius: '50%',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          color: 'var(--color-white)',
                           fontSize: 'var(--font-size-sm)',
                           fontWeight: '600'
                         }}>
-                          <span>{collaborator.firstName?.[0]}{collaborator.lastName?.[0]}</span>
+                          <span>{getInitials(collaborator.firstName, collaborator.lastName)}</span>
                         </div>
                         <div>
                           <div style={{ 

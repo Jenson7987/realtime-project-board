@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { getAvatarColor, getInitials } from '../utils/avatarColors';
 
 const Home: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
+
+  // Get avatar color and initials
+  const avatarColor = getAvatarColor(user?.id || user?.username || '');
+  const initials = getInitials(user?.firstName, user?.lastName);
 
   // Close user menu when clicking outside
   useEffect(() => {
@@ -73,9 +78,12 @@ const Home: React.FC = () => {
                     className="flex items-center space-x-3 bg-white/60 backdrop-blur-sm rounded-full px-4 py-2 border border-gray-200 cursor-pointer hover:bg-white hover:shadow-md transition-all duration-200"
                     onClick={() => setShowUserMenu(!showUserMenu)}
                   >
-                    <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-                      <span className="text-white text-sm font-semibold">
-                        {user?.firstName?.[0]}{user?.lastName?.[0]}
+                    <div 
+                      className="w-8 h-8 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: avatarColor.bg, color: avatarColor.text }}
+                    >
+                      <span className="text-sm font-semibold">
+                        {initials}
                       </span>
                     </div>
                     <div className="text-sm">

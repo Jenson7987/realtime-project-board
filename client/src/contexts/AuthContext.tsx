@@ -44,7 +44,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (response.ok) {
           const userData = await response.json();
-          setUser(userData);
+          // Map _id to id for consistency with the interface
+          const mappedUser = {
+            ...userData,
+            id: userData._id || userData.id
+          };
+          setUser(mappedUser);
         } else {
           // If token is invalid, clear everything
           localStorage.removeItem('token');
@@ -86,7 +91,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Setting token and user data');
       localStorage.setItem('token', data.token);
       setToken(data.token);
-      setUser(data.user);
+      // Map _id to id for consistency with the interface
+      const mappedUser = {
+        ...data.user,
+        id: data.user._id || data.user.id
+      };
+      setUser(mappedUser);
       console.log('Login successful');
     } catch (error) {
       console.error('Login error:', error);
@@ -111,7 +121,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const data = await response.json();
     localStorage.setItem('token', data.token);
     setToken(data.token);
-    setUser(data.user);
+    // Map _id to id for consistency with the interface
+    const mappedUser = {
+      ...data.user,
+      id: data.user._id || data.user.id
+    };
+    setUser(mappedUser);
   };
 
   const logout = () => {

@@ -11,6 +11,7 @@ import { useAuth } from './contexts/AuthContext';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useSocket } from './hooks/useSocket';
 import ShareBoardModal from './components/ShareBoardModal';
+import { getAvatarColor, getInitials } from './utils/avatarColors';
 
 const BoardView: React.FC = () => {
   const { token, isAuthenticated, isLoading, user, logout } = useAuth();
@@ -797,8 +798,21 @@ const BoardView: React.FC = () => {
                 className="user-menu-trigger"
                 onClick={() => setShowUserMenu(!showUserMenu)}
               >
-                <div className="user-avatar">
-                  <span>{user?.firstName?.[0]}{user?.lastName?.[0]}</span>
+                <div 
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    backgroundColor: getAvatarColor(user?.id || user?.username || '').bg,
+                    color: getAvatarColor(user?.id || user?.username || '').text,
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: '600'
+                  }}
+                >
+                  <span>{getInitials(user?.firstName, user?.lastName)}</span>
                 </div>
                 <div className="user-info">
                   <div className="user-name">{user?.firstName} {user?.lastName}</div>
@@ -1210,21 +1224,33 @@ const BoardView: React.FC = () => {
                     fontSize: 'var(--font-size-xs)',
                     lineHeight: 'var(--line-height-relaxed)'
                   }}>
-                    <div>Created: {new Date(selectedCard.createdAt || '').toLocaleString('en-GB', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}</div>
-                    {selectedCard.updatedAt && (
-                      <div>Last updated: {new Date(selectedCard.updatedAt).toLocaleString('en-GB', {
+                    <div style={{ marginBottom: 'var(--space-2)' }}>
+                      <strong>Created by:</strong> {selectedCard.createdBy?.firstName} {selectedCard.createdBy?.lastName} ({selectedCard.createdBy?.username})
+                    </div>
+                    <div style={{ marginBottom: 'var(--space-2)' }}>
+                      <strong>Created:</strong> {new Date(selectedCard.createdAt || '').toLocaleString('en-GB', {
                         day: 'numeric',
                         month: 'short',
                         year: 'numeric',
                         hour: '2-digit',
                         minute: '2-digit'
-                      })}</div>
+                      })}
+                    </div>
+                    {selectedCard.modifiedBy && (
+                      <div style={{ marginBottom: 'var(--space-2)' }}>
+                        <strong>Last modified by:</strong> {selectedCard.modifiedBy?.firstName} {selectedCard.modifiedBy?.lastName} ({selectedCard.modifiedBy?.username})
+                      </div>
+                    )}
+                    {selectedCard.updatedAt && (
+                      <div>
+                        <strong>Last updated:</strong> {new Date(selectedCard.updatedAt).toLocaleString('en-GB', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </div>
                     )}
                   </div>
                 </div>
