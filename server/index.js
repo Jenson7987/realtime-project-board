@@ -302,7 +302,8 @@ io.on('connection', (socket) => {
 
       await board.save();
 
-      // Populate the modifiedBy field for all cards
+      // Populate both createdBy and modifiedBy fields for all cards
+      await board.populate('cards.createdBy', 'username firstName lastName');
       await board.populate('cards.modifiedBy', 'username firstName lastName');
 
       // Emit all updated cards to all clients in the room
