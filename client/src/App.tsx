@@ -40,7 +40,8 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/verify-email" replace />;
   }
   
-  return isAuthenticated ? <Navigate to="/" replace /> : <>{children}</>;
+  // Allow authenticated users to access public routes (like login) but show a message
+  return <>{children}</>;
 }
 
 function App() {

@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 const EmailVerification: React.FC = () => {
   const navigate = useNavigate();
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, clearVerification } = useAuth();
   const [verificationCode, setVerificationCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -217,7 +217,10 @@ const EmailVerification: React.FC = () => {
             <div className="text-center">
               <button
                 type="button"
-                onClick={() => navigate('/login')}
+                onClick={() => {
+                  clearVerification();
+                  window.location.href = '/login';
+                }}
                 className="text-sm text-gray-600 hover:text-gray-500"
               >
                 Back to login

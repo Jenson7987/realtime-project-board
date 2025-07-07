@@ -22,6 +22,7 @@ interface AuthContextType {
   requiresVerification: boolean;
   isBackendOnline: boolean;
   checkBackendStatus: () => Promise<void>;
+  clearVerification: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -170,8 +171,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setRequiresVerification(false);
     
-    // Use window.location to force navigation to home page
-    window.location.href = '/';
+    // Use setTimeout to ensure state is cleared before navigation
+    setTimeout(() => {
+      setIsLoggingOut(false);
+      // Use window.location to force navigation to home page and clear any cached state
+      window.location.href = '/';
+    }, 100);
+  };
+
+  const clearVerification = () => {
+    setRequiresVerification(false);
+    setUser(null);
+    setToken(null);
+    localStorage.removeItem('token');
   };
 
   const checkBackendStatus = async () => {
@@ -207,7 +219,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isLoading: isLoading,
       requiresVerification,
       isBackendOnline,
-      checkBackendStatus
+      checkBackendStatus,
+      clearVerification
     }}>
       {children}
     </AuthContext.Provider>
