@@ -33,7 +33,7 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, requiresVerification } = useAuth();
+  const { requiresVerification } = useAuth();
   
   // If user needs verification, redirect to verification page
   if (requiresVerification) {
