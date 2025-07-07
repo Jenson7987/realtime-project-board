@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -12,17 +12,7 @@ const VerifyEmail: React.FC = () => {
 
   const token = searchParams.get('token');
 
-  useEffect(() => {
-    if (!token) {
-      setStatus('error');
-      setMessage('No verification token provided');
-      return;
-    }
-
-    verifyEmail();
-  }, [token]);
-
-  const verifyEmail = async () => {
+  const verifyEmail = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/verify-email', {
         method: 'POST',
@@ -49,7 +39,17 @@ const VerifyEmail: React.FC = () => {
       setStatus('error');
       setMessage('Failed to verify email. Please try again.');
     }
-  };
+  }, [token, updateUser]);
+
+  useEffect(() => {
+    if (!token) {
+      setStatus('error');
+      setMessage('No verification token provided');
+      return;
+    }
+
+    verifyEmail();
+  }, [token, verifyEmail]);
 
   const resendVerification = async () => {
     if (!user) return;

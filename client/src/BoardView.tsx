@@ -248,9 +248,7 @@ const BoardView: React.FC = () => {
     const destList = columnsMap[destination.droppableId] || (columnsMap[destination.droppableId] = []);
     
 
-    const fromColumn = source.droppableId;
     const toColumn = destination.droppableId;
-    const fromIndex = movingCard.position;
 
     // Update the moved card with its new location
     movingCard.columnId = toColumn;

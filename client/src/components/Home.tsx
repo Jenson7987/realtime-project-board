@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getAvatarColor, getInitials } from '../utils/avatarColors';
 
 const Home: React.FC = () => {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   // Get avatar color and initials

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../contexts/AuthContext';
 import { User } from '../types';
@@ -27,13 +27,7 @@ const ShareBoardModal: React.FC<ShareBoardModalProps> = ({
   const [isLoadingCollaborators, setIsLoadingCollaborators] = useState(false);
   const [isRemoving, setIsRemoving] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (isOpen && boardId) {
-      fetchCollaborators();
-    }
-  }, [isOpen, boardId]);
-
-  const fetchCollaborators = async () => {
+  const fetchCollaborators = useCallback(async () => {
     if (!token || !boardId) return;
     
     setIsLoadingCollaborators(true);
@@ -52,7 +46,13 @@ const ShareBoardModal: React.FC<ShareBoardModalProps> = ({
     } finally {
       setIsLoadingCollaborators(false);
     }
-  };
+  }, [token, boardId]);
+
+  useEffect(() => {
+    if (isOpen && boardId) {
+      fetchCollaborators();
+    }
+  }, [isOpen, boardId, fetchCollaborators]);
 
   const handleShare = async (e: React.FormEvent) => {
     e.preventDefault();

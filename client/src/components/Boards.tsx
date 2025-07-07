@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE_URL } from '../config';
@@ -21,13 +21,33 @@ const Boards: React.FC = () => {
   const avatarColor = getAvatarColor(user?.id || user?.username || '');
   const initials = getInitials(user?.firstName, user?.lastName);
 
+  const fetchBoards = useCallback(async () => {
+    if (!token) return;
+    
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/boards`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (!response.ok) throw new Error('Failed to fetch boards');
+      
+      const data = await response.json();
+      setBoards(data.boards || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch boards');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
+
   useEffect(() => {
     if (token) {
       fetchBoards();
     } else {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [token, fetchBoards]);
 
   // Close user menu when clicking outside
   useEffect(() => {
@@ -46,26 +66,6 @@ const Boards: React.FC = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showUserMenu]);
-
-  const fetchBoards = async () => {
-    if (!token) return;
-    
-    setIsLoading(true);
-    try {
-      const response = await fetch(`${API_BASE_URL}/boards`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      if (!response.ok) throw new Error('Failed to fetch boards');
-      
-      const data = await response.json();
-      setBoards(data.boards || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch boards');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const createDefaultBoard = async () => {
     if (!token) return;
