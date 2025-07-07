@@ -12,10 +12,13 @@ export const useSocket = () => {
     // Create a unique ID for this tab
     const tabId = Math.random().toString(36).substring(7);
 
+    // Get the backend URL from environment or default to localhost
+    const backendUrl = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:3001';
+
     // Only create a new socket if one doesn't exist
     if (!socketRef.current) {
       console.log('Initializing socket connection...');
-      socketRef.current = io('http://localhost:3001', {
+      socketRef.current = io(backendUrl, {
         transports: ['polling', 'websocket'],
         auth: {
           token,
