@@ -86,9 +86,11 @@ This guide will help you deploy your realtime project board to Render (backend) 
 
 ## Environment Variables Reference
 
+**Important**: Never commit real credentials to Git. The examples below use placeholder values. Replace them with your actual values in your deployment platform's environment variables.
+
 ### Backend (Render)
 ```
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/project-board?retryWrites=true&w=majority
+MONGODB_URI=mongodb+srv://your-username:your-password@your-cluster.mongodb.net/project-board?retryWrites=true&w=majority
 JWT_SECRET=your_super_secret_jwt_key_here
 PORT=3001
 FRONTEND_URL=https://your-app-name.netlify.app

@@ -16,7 +16,7 @@ if [ ! -f ".env" ]; then
     echo "Creating .env.example file..."
     cat > .env.example << EOF
 # Database Configuration
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/project-board?retryWrites=true&w=majority
+MONGODB_URI=mongodb+srv://your-username:your-password@your-cluster.mongodb.net/project-board?retryWrites=true&w=majority
 
 # JWT Configuration
 JWT_SECRET=your_super_secret_jwt_key_here_make_it_long_and_random
