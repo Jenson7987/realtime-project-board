@@ -33,10 +33,19 @@ const sendVerificationEmail = async (email, code, username) => {
   };
 
   try {
+    console.log('=== EMAIL DEBUG ===');
+    console.log('SENDGRID_API_KEY exists:', !!process.env.SENDGRID_API_KEY);
+    console.log('SENDGRID_FROM_EMAIL:', process.env.SENDGRID_FROM_EMAIL);
+    console.log('FROM_EMAIL:', process.env.FROM_EMAIL);
+    console.log('Using from email:', process.env.SENDGRID_FROM_EMAIL || process.env.FROM_EMAIL);
+    console.log('Sending to:', email);
+    console.log('==================');
+    
     await sgMail.send(msg);
     console.log('Verification email sent to:', email);
   } catch (error) {
     console.error('Error sending verification email:', error);
+    console.error('Full error object:', JSON.stringify(error, null, 2));
     throw new Error('Failed to send verification email');
   }
 };

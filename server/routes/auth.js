@@ -49,10 +49,17 @@ router.post('/register', async (req, res) => {
     console.log('User saved successfully');
 
     // Send verification email
+    console.log('=== REGISTRATION DEBUG ===');
+    console.log('About to send verification email to:', email);
+    console.log('Verification code:', verificationCode);
+    console.log('==========================');
+    
     try {
       await sendVerificationEmail(email, verificationCode, username);
+      console.log('Email sending completed successfully');
     } catch (emailError) {
       console.error('Failed to send verification email:', emailError);
+      console.error('Email error details:', emailError.message);
       // Don't fail registration if email fails, but log it
     }
 
