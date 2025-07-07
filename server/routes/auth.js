@@ -108,11 +108,22 @@ router.post('/verify-email', async (req, res) => {
       return res.status(400).json({ error: 'Verification code is required' });
     }
 
+    console.log('=== VERIFICATION DEBUG ===');
+    console.log('Received code:', code);
+    console.log('Code type:', typeof code);
+
     const user = await User.findOne({ emailVerificationCode: code });
 
     if (!user) {
+      console.log('No user found with code:', code);
       return res.status(400).json({ error: 'Invalid verification code' });
     }
+
+    console.log('Found user:', user.email);
+    console.log('Stored code:', user.emailVerificationCode);
+    console.log('Code expires at:', user.emailVerificationExpires);
+    console.log('Current time:', new Date());
+    console.log('Is expired:', Date.now() > user.emailVerificationExpires);
 
     // Check if account is locked out
     if (user.isLockedOut()) {
@@ -124,12 +135,16 @@ router.post('/verify-email', async (req, res) => {
     }
 
     if (Date.now() > user.emailVerificationExpires) {
+      console.log('Code has expired');
       return res.status(400).json({ error: 'Verification code has expired' });
     }
 
     // Verify the email
     const isVerified = user.verifyEmailCode(code);
+    console.log('Verification result:', isVerified);
+    
     if (!isVerified) {
+      console.log('Verification failed');
       // Increment failed attempts
       const attempts = user.incrementFailedAttempts();
       await user.save();
@@ -148,6 +163,7 @@ router.post('/verify-email', async (req, res) => {
     }
 
     await user.save();
+    console.log('User saved successfully, email verified');
 
     // Generate new JWT token for verified user
     const token = jwt.sign(
@@ -155,6 +171,9 @@ router.post('/verify-email', async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
+
+    console.log('Generated new token for verified user');
+    console.log('==================');
 
     res.json({ 
       message: 'Email verified successfully!',
@@ -175,9 +194,30 @@ router.post('/verify-email', async (req, res) => {
 });
 
 // POST /api/auth/resend-verification - Resend verification email
-router.post('/resend-verification', auth, async (req, res) => {
+router.post('/resend-verification', async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    let user;
+    
+    // Try to get user from auth token first
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        user = await User.findById(decoded.userId);
+      } catch (tokenError) {
+        console.log('Invalid token, will try email lookup');
+      }
+    }
+    
+    // If no user from token, try to get from request body
+    if (!user && req.body.email) {
+      user = await User.findOne({ email: req.body.email.toLowerCase() });
+    }
+    
+    if (!user) {
+      return res.status(400).json({ error: 'User not found' });
+    }
 
     if (user.isEmailVerified) {
       return res.status(400).json({ error: 'Email is already verified' });

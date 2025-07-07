@@ -97,19 +97,31 @@ userSchema.methods.generateEmailVerificationCode = function() {
 
 // Method to verify email code
 userSchema.methods.verifyEmailCode = function(code) {
+  console.log('=== VERIFY EMAIL CODE DEBUG ===');
+  console.log('Input code:', code, 'Type:', typeof code);
+  console.log('Stored code:', this.emailVerificationCode, 'Type:', typeof this.emailVerificationCode);
+  console.log('Codes match:', this.emailVerificationCode === code);
+  console.log('Current time:', Date.now());
+  console.log('Expires at:', this.emailVerificationExpires);
+  console.log('Is expired:', Date.now() > this.emailVerificationExpires);
+  
   if (this.emailVerificationCode !== code) {
+    console.log('Code mismatch - verification failed');
     return false;
   }
   
   if (Date.now() > this.emailVerificationExpires) {
+    console.log('Code expired - verification failed');
     return false;
   }
   
+  console.log('Verification successful - updating user');
   this.isEmailVerified = true;
   this.emailVerificationCode = undefined;
   this.emailVerificationExpires = undefined;
   this.verificationAttempts = 0; // Reset attempts on successful verification
   this.verificationLockoutUntil = undefined; // Clear lockout
+  console.log('==================');
   return true;
 };
 

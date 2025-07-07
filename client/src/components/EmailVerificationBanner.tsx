@@ -21,6 +21,7 @@ const EmailVerificationBanner: React.FC = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
+        body: JSON.stringify({ email: user.email }), // Include email as fallback
       });
 
       const data = await response.json();

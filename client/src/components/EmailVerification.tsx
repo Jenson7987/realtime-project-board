@@ -10,7 +10,7 @@ const EmailVerification: React.FC = () => {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [isResending, setIsResending] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(30); // 30 seconds for resend cooldown
 
   // Countdown timer
   useEffect(() => {
@@ -83,13 +83,14 @@ const EmailVerification: React.FC = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
+        body: JSON.stringify({ email: user.email }), // Include email as fallback
       });
 
       const data = await response.json();
 
       if (response.ok) {
         setMessage('Verification email sent successfully!');
-        setTimeLeft(600); // Reset timer
+        setTimeLeft(30); // Reset resend cooldown timer to 30 seconds
         setVerificationCode(''); // Clear any existing code
       } else {
         setError(data.error || 'Failed to resend verification email');
@@ -100,6 +101,13 @@ const EmailVerification: React.FC = () => {
       setIsResending(false);
     }
   };
+
+  // Clear error when resend timer expires
+  useEffect(() => {
+    if (timeLeft === 0 && !isResending) {
+      setError(''); // Clear any previous errors when resend becomes available
+    }
+  }, [timeLeft, isResending]);
 
   const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, '').slice(0, 6); // Only allow digits, max 6
@@ -180,7 +188,7 @@ const EmailVerification: React.FC = () => {
             {timeLeft > 0 && (
               <div className="text-center">
                 <p className="text-sm text-gray-600">
-                  Code expires in: <span className="font-mono font-medium">{formatTime(timeLeft)}</span>
+                  Resend available in: <span className="font-mono font-medium">{formatTime(timeLeft)}</span>
                 </p>
               </div>
             )}
