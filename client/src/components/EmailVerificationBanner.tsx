@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { API_BASE_URL } from '../config';
 
 const EmailVerificationBanner: React.FC = () => {
   const { user } = useAuth();
@@ -15,7 +16,7 @@ const EmailVerificationBanner: React.FC = () => {
     setMessage('');
     
     try {
-      const response = await fetch('/api/auth/resend-verification', {
+      const response = await fetch(`${API_BASE_URL}/auth/resend-verification`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

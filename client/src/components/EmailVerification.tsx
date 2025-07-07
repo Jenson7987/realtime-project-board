@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { API_BASE_URL } from '../config';
 
 const EmailVerification: React.FC = () => {
   const navigate = useNavigate();
@@ -33,7 +34,7 @@ const EmailVerification: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/auth/verify-email', {
+      const response = await fetch(`${API_BASE_URL}/auth/verify-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -84,7 +85,7 @@ const EmailVerification: React.FC = () => {
     setMessage('');
     
     try {
-      const response = await fetch('/api/auth/resend-verification', {
+      const response = await fetch(`${API_BASE_URL}/auth/resend-verification`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

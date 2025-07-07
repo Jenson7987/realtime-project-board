@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { API_BASE_URL } from '../config';
 
 const VerifyEmail: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -14,7 +15,7 @@ const VerifyEmail: React.FC = () => {
 
   const verifyEmail = useCallback(async () => {
     try {
-      const response = await fetch('/api/auth/verify-email', {
+      const response = await fetch(`${API_BASE_URL}/auth/verify-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -56,7 +57,7 @@ const VerifyEmail: React.FC = () => {
 
     setIsResending(true);
     try {
-      const response = await fetch('/api/auth/resend-verification', {
+      const response = await fetch(`${API_BASE_URL}/auth/resend-verification`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
