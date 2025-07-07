@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 const userSchema = new mongoose.Schema({
   username: {
@@ -33,6 +34,25 @@ const userSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  // Email verification fields
+  isEmailVerified: {
+    type: Boolean,
+    default: false
+  },
+  emailVerificationCode: {
+    type: String
+  },
+  emailVerificationExpires: {
+    type: Date
+  },
+  // Brute force protection fields
+  verificationAttempts: {
+    type: Number,
+    default: 0
+  },
+  verificationLockoutUntil: {
+    type: Date
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -64,6 +84,59 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
   const isMatch = await bcrypt.compare(candidatePassword, this.password);
   console.log('Password match result:', isMatch);
   return isMatch;
+};
+
+// Method to generate email verification code
+userSchema.methods.generateEmailVerificationCode = function() {
+  // Generate a 6-digit code
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  this.emailVerificationCode = code;
+  this.emailVerificationExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+  return code;
+};
+
+// Method to verify email code
+userSchema.methods.verifyEmailCode = function(code) {
+  if (this.emailVerificationCode !== code) {
+    return false;
+  }
+  
+  if (Date.now() > this.emailVerificationExpires) {
+    return false;
+  }
+  
+  this.isEmailVerified = true;
+  this.emailVerificationCode = undefined;
+  this.emailVerificationExpires = undefined;
+  this.verificationAttempts = 0; // Reset attempts on successful verification
+  this.verificationLockoutUntil = undefined; // Clear lockout
+  return true;
+};
+
+// Method to check if account is locked out
+userSchema.methods.isLockedOut = function() {
+  if (!this.verificationLockoutUntil) {
+    return false;
+  }
+  return Date.now() < this.verificationLockoutUntil.getTime();
+};
+
+// Method to increment failed attempts
+userSchema.methods.incrementFailedAttempts = function() {
+  this.verificationAttempts += 1;
+  
+  // Lock out after 5 failed attempts for 15 minutes
+  if (this.verificationAttempts >= 5) {
+    this.verificationLockoutUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+  }
+  
+  return this.verificationAttempts;
+};
+
+// Method to reset verification attempts (for resend)
+userSchema.methods.resetVerificationAttempts = function() {
+  this.verificationAttempts = 0;
+  this.verificationLockoutUntil = undefined;
 };
 
 module.exports = mongoose.model('User', userSchema); 

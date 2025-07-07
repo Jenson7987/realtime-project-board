@@ -37,7 +37,7 @@ const Register: React.FC = () => {
 
     try {
       await register(username, email, password, firstName, lastName);
-      navigate('/');
+      navigate('/verify-email');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to register');
     } finally {

@@ -8,6 +8,7 @@ interface User {
   email: string;
   firstName: string;
   lastName: string;
+  isEmailVerified: boolean;
 }
 
 interface AuthContextType {
@@ -16,8 +17,10 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => void;
+  updateUser: (updatedUser: User) => void;
   isAuthenticated: boolean;
   isLoading: boolean;
+  requiresVerification: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,6 +30,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [isLoading, setIsLoading] = useState(!!localStorage.getItem('token'));
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [requiresVerification, setRequiresVerification] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -47,9 +51,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Map _id to id for consistency with the interface
           const mappedUser = {
             ...userData,
-            id: userData._id || userData.id
+            id: userData._id || userData.id,
+            isEmailVerified: userData.isEmailVerified || false
           };
           setUser(mappedUser);
+          
+          // Check if user needs verification
+          if (!mappedUser.isEmailVerified) {
+            setRequiresVerification(true);
+          }
         } else {
           // If token is invalid, clear everything
           localStorage.removeItem('token');
@@ -85,6 +95,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Login response data:', data);
 
       if (!response.ok) {
+        if (response.status === 403 && data.requiresVerification) {
+          // User needs to verify email
+          setRequiresVerification(true);
+          setUser(data.user);
+          setToken(localStorage.getItem('token')); // Keep existing token
+          throw new Error('Please verify your email address before logging in');
+        }
         throw new Error(data.error || 'Failed to login');
       }
 
@@ -94,9 +111,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Map _id to id for consistency with the interface
       const mappedUser = {
         ...data.user,
-        id: data.user._id || data.user.id
+        id: data.user._id || data.user.id,
+        isEmailVerified: data.user.isEmailVerified || false
       };
       setUser(mappedUser);
+      setRequiresVerification(false);
       console.log('Login successful');
     } catch (error) {
       console.error('Login error:', error);
@@ -124,9 +143,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Map _id to id for consistency with the interface
     const mappedUser = {
       ...data.user,
-      id: data.user._id || data.user.id
+      id: data.user._id || data.user.id,
+      isEmailVerified: data.user.isEmailVerified || false
     };
     setUser(mappedUser);
+    
+    // Check if verification is required
+    if (data.requiresVerification) {
+      setRequiresVerification(true);
+    }
+  };
+
+  const updateUser = (updatedUser: User) => {
+    setUser(updatedUser);
+    if (updatedUser.isEmailVerified) {
+      setRequiresVerification(false);
+    }
   };
 
   const logout = () => {
@@ -134,6 +166,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('token');
     setToken(null);
     setUser(null);
+    setRequiresVerification(false);
     
     // Use window.location to force navigation to home page
     window.location.href = '/';
@@ -146,8 +179,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       login, 
       register, 
       logout,
+      updateUser,
       isAuthenticated: !!token && !!user && !isLoggingOut,
-      isLoading: isLoading
+      isLoading: isLoading,
+      requiresVerification
     }}>
       {children}
     </AuthContext.Provider>

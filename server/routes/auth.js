@@ -3,6 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
+const { sendVerificationEmail, sendPasswordResetEmail } = require('../services/emailService');
 
 // POST /api/auth/register - Register a new user
 router.post('/register', async (req, res) => {
@@ -33,6 +34,9 @@ router.post('/register', async (req, res) => {
       lastName
     });
 
+    // Generate email verification code
+    const verificationCode = user.generateEmailVerificationCode();
+
     console.log('Created user object:', { 
       username: user.username,
       email: user.email, 
@@ -44,7 +48,15 @@ router.post('/register', async (req, res) => {
     await user.save();
     console.log('User saved successfully');
 
-    // Generate JWT token
+    // Send verification email
+    try {
+      await sendVerificationEmail(email, verificationCode, username);
+    } catch (emailError) {
+      console.error('Failed to send verification email:', emailError);
+      // Don't fail registration if email fails, but log it
+    }
+
+    // Generate JWT token (user can still login but with limited access)
     const token = jwt.sign(
       { userId: user._id },
       process.env.JWT_SECRET,
@@ -60,8 +72,11 @@ router.post('/register', async (req, res) => {
         username: user.username,
         email: user.email,
         firstName: user.firstName,
-        lastName: user.lastName
-      }
+        lastName: user.lastName,
+        isEmailVerified: user.isEmailVerified
+      },
+      message: 'Registration successful! Please check your email for a verification code.',
+      requiresVerification: true
     });
   } catch (err) {
     console.error('Registration error:', err);
@@ -74,6 +89,171 @@ router.post('/register', async (req, res) => {
       }
     }
     res.status(500).json({ error: 'Failed to register user' });
+  }
+});
+
+// POST /api/auth/verify-email - Verify email address with code
+router.post('/verify-email', async (req, res) => {
+  try {
+    const { code } = req.body;
+
+    if (!code) {
+      return res.status(400).json({ error: 'Verification code is required' });
+    }
+
+    const user = await User.findOne({ emailVerificationCode: code });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid verification code' });
+    }
+
+    // Check if account is locked out
+    if (user.isLockedOut()) {
+      const lockoutTime = Math.ceil((user.verificationLockoutUntil.getTime() - Date.now()) / 1000 / 60);
+      return res.status(429).json({ 
+        error: `Too many failed attempts. Please try again in ${lockoutTime} minutes.`,
+        lockoutTime: lockoutTime
+      });
+    }
+
+    if (Date.now() > user.emailVerificationExpires) {
+      return res.status(400).json({ error: 'Verification code has expired' });
+    }
+
+    // Verify the email
+    const isVerified = user.verifyEmailCode(code);
+    if (!isVerified) {
+      // Increment failed attempts
+      const attempts = user.incrementFailedAttempts();
+      await user.save();
+      
+      const remainingAttempts = 5 - attempts;
+      if (remainingAttempts > 0) {
+        return res.status(400).json({ 
+          error: `Invalid verification code. ${remainingAttempts} attempts remaining.` 
+        });
+      } else {
+        return res.status(429).json({ 
+          error: 'Too many failed attempts. Please try again in 15 minutes.',
+          lockoutTime: 15
+        });
+      }
+    }
+
+    await user.save();
+
+    // Generate new JWT token for verified user
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.json({ 
+      message: 'Email verified successfully!',
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        isEmailVerified: user.isEmailVerified
+      }
+    });
+  } catch (error) {
+    console.error('Email verification error:', error);
+    res.status(500).json({ error: 'Failed to verify email' });
+  }
+});
+
+// POST /api/auth/resend-verification - Resend verification email
+router.post('/resend-verification', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+
+    if (user.isEmailVerified) {
+      return res.status(400).json({ error: 'Email is already verified' });
+    }
+
+    // Check if account is locked out
+    if (user.isLockedOut()) {
+      const lockoutTime = Math.ceil((user.verificationLockoutUntil.getTime() - Date.now()) / 1000 / 60);
+      return res.status(429).json({ 
+        error: `Account is locked due to too many failed attempts. Please try again in ${lockoutTime} minutes.`,
+        lockoutTime: lockoutTime
+      });
+    }
+
+    // Generate new verification code and reset attempts
+    const verificationCode = user.generateEmailVerificationCode();
+    user.resetVerificationAttempts(); // Reset brute force protection
+    await user.save();
+
+    // Send verification email
+    await sendVerificationEmail(user.email, verificationCode, user.username);
+
+    res.json({ message: 'Verification email sent successfully' });
+  } catch (error) {
+    console.error('Resend verification error:', error);
+    res.status(500).json({ error: 'Failed to resend verification email' });
+  }
+});
+
+// POST /api/auth/forgot-password - Request password reset
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      // Don't reveal if email exists or not for security
+      return res.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
+    }
+
+    // Generate password reset token
+    const resetToken = user.generateEmailVerificationCode(); // Reuse the same method
+    await user.save();
+
+    // Send password reset email
+    await sendPasswordResetEmail(user.email, resetToken, user.username);
+
+    res.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ error: 'Failed to process password reset request' });
+  }
+});
+
+// POST /api/auth/reset-password - Reset password with token
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: 'Token and new password are required' });
+    }
+
+    const user = await User.findOne({ emailVerificationCode: token });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid reset token' });
+    }
+
+    if (Date.now() > user.emailVerificationExpires) {
+      return res.status(400).json({ error: 'Reset token has expired' });
+    }
+
+    // Update password
+    user.password = newPassword;
+    user.emailVerificationCode = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save();
+
+    res.json({ message: 'Password reset successfully' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ error: 'Failed to reset password' });
   }
 });
 
@@ -103,6 +283,22 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid username/email or password' });
     }
 
+    // Check if email is verified
+    if (!user.isEmailVerified) {
+      return res.status(403).json({ 
+        error: 'Please verify your email address before logging in',
+        requiresVerification: true,
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          isEmailVerified: user.isEmailVerified
+        }
+      });
+    }
+
     // Generate JWT token
     const token = jwt.sign(
       { userId: user._id },
@@ -118,7 +314,8 @@ router.post('/login', async (req, res) => {
         username: user.username,
         email: user.email,
         firstName: user.firstName,
-        lastName: user.lastName
+        lastName: user.lastName,
+        isEmailVerified: user.isEmailVerified
       }
     });
   } catch (err) {

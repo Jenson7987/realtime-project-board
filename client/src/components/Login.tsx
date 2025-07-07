@@ -84,6 +84,11 @@ const Login: React.FC = () => {
                   placeholder="Enter your password"
                 />
               </div>
+              <div className="mt-2 text-right">
+                <Link to="/forgot-password" className="text-sm text-blue-600 hover:text-blue-500">
+                  Forgot your password?
+                </Link>
+              </div>
             </div>
 
             <div>
