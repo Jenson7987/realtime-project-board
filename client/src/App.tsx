@@ -10,6 +10,7 @@ import VerifyEmail from './components/VerifyEmail';
 import EmailVerification from './components/EmailVerification';
 import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
+import BackendStatus from './components/BackendStatus';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, requiresVerification } = useAuth();
@@ -46,6 +47,7 @@ function App() {
   return (
     <Router>
       <AuthProvider>
+        <BackendStatus />
         <Routes>
           <Route
             path="/login"

@@ -23,7 +23,7 @@ JWT_SECRET=your_super_secret_jwt_key_here_make_it_long_and_random
 
 # Email Configuration (Optional - for email verification)
 SENDGRID_API_KEY=your_sendgrid_api_key_here
-FROM_EMAIL=your_email@domain.com
+SENDGRID_FROM_EMAIL=your_email@domain.com
 
 # Frontend URL (for CORS)
 FRONTEND_URL=https://your-app-name.netlify.app

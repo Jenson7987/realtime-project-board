@@ -48,6 +48,11 @@ const boardRoutes = require('./routes/boards');
 const cardRoutes = require('./routes/cards');
 const authRoutes = require('./routes/auth');
 
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/boards', boardRoutes);
 app.use('/api/cards', cardRoutes);

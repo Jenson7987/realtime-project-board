@@ -94,6 +94,10 @@ MONGODB_URI=mongodb+srv://your-username:your-password@your-cluster.mongodb.net/p
 JWT_SECRET=your_super_secret_jwt_key_here
 PORT=3001
 FRONTEND_URL=https://your-app-name.netlify.app
+
+# Email Configuration (Optional - for email verification)
+SENDGRID_API_KEY=your_sendgrid_api_key_here
+SENDGRID_FROM_EMAIL=your_email@domain.com
 ```
 
 ### Frontend (Netlify)

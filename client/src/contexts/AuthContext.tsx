@@ -20,6 +20,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   requiresVerification: boolean;
+  isBackendOnline: boolean;
+  checkBackendStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,6 +32,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(!!localStorage.getItem('token'));
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [requiresVerification, setRequiresVerification] = useState(false);
+  const [isBackendOnline, setIsBackendOnline] = useState(true);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -171,6 +174,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     window.location.href = '/';
   };
 
+  const checkBackendStatus = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/health`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      setIsBackendOnline(response.ok);
+    } catch (error) {
+      setIsBackendOnline(false);
+    }
+  };
+
+  // Check backend status on mount and periodically
+  useEffect(() => {
+    checkBackendStatus();
+    const interval = setInterval(checkBackendStatus, 30000); // Check every 30 seconds
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -181,7 +205,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updateUser,
       isAuthenticated: !!token && !!user && !isLoggingOut,
       isLoading: isLoading,
-      requiresVerification
+      requiresVerification,
+      isBackendOnline,
+      checkBackendStatus
     }}>
       {children}
     </AuthContext.Provider>

@@ -6,7 +6,7 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 const sendVerificationEmail = async (email, code, username) => {
   const msg = {
     to: email,
-    from: process.env.SENDGRID_FROM_EMAIL, // Must be verified in SendGrid
+    from: process.env.SENDGRID_FROM_EMAIL || process.env.FROM_EMAIL, // Must be verified in SendGrid
     subject: 'Verify your email address - Project Board',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f8f9fa; padding: 20px;">
@@ -42,11 +42,11 @@ const sendVerificationEmail = async (email, code, username) => {
 };
 
 const sendPasswordResetEmail = async (email, token, username) => {
-  const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
+  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
   
   const msg = {
     to: email,
-    from: process.env.SENDGRID_FROM_EMAIL,
+    from: process.env.SENDGRID_FROM_EMAIL || process.env.FROM_EMAIL,
     subject: 'Reset your password - Project Board',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f8f9fa; padding: 20px;">
