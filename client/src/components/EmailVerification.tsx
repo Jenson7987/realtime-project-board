@@ -70,7 +70,14 @@ const EmailVerification: React.FC = () => {
   };
 
   const resendVerification = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('No user found, cannot resend verification');
+      return;
+    }
+
+    console.log('Resend verification clicked');
+    console.log('User:', user);
+    console.log('Token:', localStorage.getItem('token'));
 
     setIsResending(true);
     setError('');
@@ -86,7 +93,9 @@ const EmailVerification: React.FC = () => {
         body: JSON.stringify({ email: user.email }), // Include email as fallback
       });
 
+      console.log('Resend response status:', response.status);
       const data = await response.json();
+      console.log('Resend response data:', data);
 
       if (response.ok) {
         setMessage('Verification email sent successfully!');
@@ -96,6 +105,7 @@ const EmailVerification: React.FC = () => {
         setError(data.error || 'Failed to resend verification email');
       }
     } catch (error) {
+      console.error('Resend verification error:', error);
       setError('Failed to resend verification email');
     } finally {
       setIsResending(false);
