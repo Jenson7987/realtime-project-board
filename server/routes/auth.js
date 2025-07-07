@@ -123,7 +123,7 @@ router.post('/verify-email', async (req, res) => {
     console.log('Stored code:', user.emailVerificationCode);
     console.log('Code expires at:', user.emailVerificationExpires);
     console.log('Current time:', new Date());
-    console.log('Is expired:', Date.now() > user.emailVerificationExpires);
+    console.log('Is expired:', Date.now() > user.emailVerificationExpires.getTime());
 
     // Check if account is locked out
     if (user.isLockedOut()) {
@@ -134,7 +134,7 @@ router.post('/verify-email', async (req, res) => {
       });
     }
 
-    if (Date.now() > user.emailVerificationExpires) {
+    if (Date.now() > user.emailVerificationExpires.getTime()) {
       console.log('Code has expired');
       return res.status(400).json({ error: 'Verification code has expired' });
     }
@@ -287,7 +287,7 @@ router.post('/reset-password', async (req, res) => {
       return res.status(400).json({ error: 'Invalid reset token' });
     }
 
-    if (Date.now() > user.emailVerificationExpires) {
+    if (Date.now() > user.emailVerificationExpires.getTime()) {
       return res.status(400).json({ error: 'Reset token has expired' });
     }
 

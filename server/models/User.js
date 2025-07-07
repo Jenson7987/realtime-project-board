@@ -103,14 +103,14 @@ userSchema.methods.verifyEmailCode = function(code) {
   console.log('Codes match:', this.emailVerificationCode === code);
   console.log('Current time:', Date.now());
   console.log('Expires at:', this.emailVerificationExpires);
-  console.log('Is expired:', Date.now() > this.emailVerificationExpires);
+  console.log('Is expired:', Date.now() > this.emailVerificationExpires.getTime());
   
   if (this.emailVerificationCode !== code) {
     console.log('Code mismatch - verification failed');
     return false;
   }
   
-  if (Date.now() > this.emailVerificationExpires) {
+  if (Date.now() > this.emailVerificationExpires.getTime()) {
     console.log('Code expired - verification failed');
     return false;
   }
