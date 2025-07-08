@@ -164,8 +164,10 @@ const BoardView: React.FC = () => {
 
     const handleCardsUpdate = (data: { boardId: string; cards: Card[] }) => {
       console.log('Received cardsUpdated event:', data);
+      console.log('Number of cards received:', data.cards.length);
       setBoard(prev => {
         if (!prev) return null;
+        console.log('Updating board with new cards');
         return {
           ...prev,
           cards: data.cards
@@ -302,15 +304,23 @@ const BoardView: React.FC = () => {
         throw new Error('Failed to update card position');
       }
 
-      // Notify other clients of the move
-      socket?.emit('moveCard', {
-        boardId: board._id,
-        cardId: draggableId,
-        sourceColumnId: source.droppableId,
-        destinationColumnId: destination.droppableId,
-        sourceIndex: source.index,
-        destinationIndex: destination.index
+      // Get the updated card from the response
+      const updatedCard = await response.json();
+      console.log('Card position updated successfully:', updatedCard);
+      
+      // Update UI with the server response as fallback
+      setBoard(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          cards: prev.cards.map(card => 
+            card._id === draggableId ? updatedCard : card
+          )
+        };
       });
+
+      // The API call above will trigger socket events to update other clients
+      // No need to manually emit moveCard event
     } catch (error) {
       console.error('Error updating card position:', error);
       // Revert optimistic update if something went wrong

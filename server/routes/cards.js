@@ -146,6 +146,16 @@ router.put('/:boardId/:cardId', auth, async (req, res) => {
     });
     console.log('cardUpdated event emitted successfully');
 
+    // Also emit the full updated board state for drag-and-drop operations
+    if (columnId !== undefined || position !== undefined) {
+      console.log('Emitting cardsUpdated event for drag-and-drop');
+      req.app.get('io').to(boardId.toString()).emit('cardsUpdated', {
+        boardId: boardId.toString(),
+        cards: board.cards
+      });
+      console.log('cardsUpdated event emitted successfully');
+    }
+
     res.json(populatedCard);
   } catch (error) {
     console.error('Error updating card:', error);
