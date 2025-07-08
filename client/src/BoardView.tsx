@@ -102,8 +102,18 @@ const BoardView: React.FC = () => {
     if (!socket || !board) return;
 
     console.log('Socket connection status:', socket.connected);
-    console.log('Joining board room:', board._id);
-    socket.emit('joinBoard', board._id);
+    console.log('Socket ID:', socket.id);
+    
+    if (socket.connected) {
+      console.log('Joining board room:', board._id);
+      socket.emit('joinBoard', board._id);
+    } else {
+      console.log('Socket not connected, waiting for connection...');
+      socket.on('connect', () => {
+        console.log('Socket connected, now joining board room:', board._id);
+        socket.emit('joinBoard', board._id);
+      });
+    }
 
     // Cleanup function
     return () => {
@@ -115,7 +125,7 @@ const BoardView: React.FC = () => {
   useEffect(() => {
     if (!socket) return;
 
-    console.log('Setting up socket event listeners');
+    console.log('Setting up socket event listeners for socket ID:', socket.id);
 
     const handleCardUpdate = (data: { boardId: string; card: Card }) => {
       console.log('Received cardUpdated event:', data);
@@ -347,6 +357,18 @@ const BoardView: React.FC = () => {
       });
 
       if (!response.ok) throw new Error('Failed to create card');
+      
+      const createdCard = await response.json();
+      console.log('Card created successfully:', createdCard);
+      
+      // Update UI immediately as fallback in case socket doesn't work
+      setBoard(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          cards: [...prev.cards, createdCard]
+        };
+      });
       
       closeAddCardModal();
     } catch (error) {
