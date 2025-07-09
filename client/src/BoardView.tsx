@@ -1104,6 +1104,18 @@ const BoardView: React.FC = () => {
                 Test Real-time
               </button>
             )}
+            
+            {/* Socket connection status */}
+            <div style={{
+              marginLeft: '10px',
+              padding: '8px 16px',
+              backgroundColor: socket?.connected ? '#4CAF50' : '#f44336',
+              color: 'white',
+              borderRadius: '4px',
+              fontSize: '12px'
+            }}>
+              Socket: {socket?.connected ? 'Connected' : 'Disconnected'}
+            </div>
           </div>
         </DragDropContext>
       </main>

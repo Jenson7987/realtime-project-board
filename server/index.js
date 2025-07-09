@@ -60,8 +60,10 @@ app.use('/api/cards', cardRoutes);
 // Socket.io authentication middleware
 io.use(async (socket, next) => {
   try {
+    console.log('=== SOCKET AUTH ATTEMPT ===');
     const token = socket.handshake.auth.token;
     console.log('Socket auth attempt with token:', token ? 'present' : 'missing');
+    console.log('Socket handshake auth:', socket.handshake.auth);
     
     if (!token) {
       console.log('No token provided for socket connection');
@@ -73,6 +75,7 @@ io.use(async (socket, next) => {
     
     const user = await User.findById(decoded.userId).select('-password');
     console.log('Socket user found:', user ? 'yes' : 'no');
+    console.log('User details:', user ? { username: user.username, id: user._id } : 'none');
     
     if (!user) {
       console.log('User not found for socket connection');
@@ -80,6 +83,7 @@ io.use(async (socket, next) => {
     }
 
     socket.user = user;
+    console.log('=== SOCKET AUTH SUCCESS ===');
     next();
   } catch (error) {
     console.error('Socket authentication error:', error);
@@ -89,12 +93,18 @@ io.use(async (socket, next) => {
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
+  console.log('=== SOCKET CONNECTION ESTABLISHED ===');
   console.log('Client connected:', socket.user.username);
+  console.log('Socket ID:', socket.id);
+  console.log('Total connected clients:', io.engine.clientsCount);
 
   // Join a board room
   socket.on('joinBoard', async (boardId) => {
     try {
+      console.log('=== JOIN BOARD ATTEMPT ===');
       console.log(`User ${socket.user.username} attempting to join board: ${boardId}`);
+      console.log(`Socket ID: ${socket.id}`);
+      
       const board = await Board.findOne({
         _id: boardId,
         $or: [
@@ -111,6 +121,11 @@ io.on('connection', (socket) => {
       socket.join(boardId.toString());
       console.log(`${socket.user.username} successfully joined board: ${boardId}`);
       console.log(`Socket rooms after join:`, Array.from(socket.rooms));
+      
+      // Log room information
+      const room = io.sockets.adapter.rooms.get(boardId.toString());
+      console.log(`Number of clients in room ${boardId}:`, room ? room.size : 0);
+      console.log('=== JOIN BOARD SUCCESS ===');
     } catch (error) {
       console.error('Error joining board:', error);
       socket.emit('error', 'Failed to join board');
@@ -283,7 +298,10 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    console.log('=== SOCKET DISCONNECTED ===');
     console.log('Client disconnected:', socket.user.username);
+    console.log('Socket ID:', socket.id);
+    console.log('Total connected clients:', io.engine.clientsCount);
   });
 });
 
