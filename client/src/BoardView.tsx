@@ -575,7 +575,7 @@ const BoardView: React.FC = () => {
         throw new Error('Failed to update column title');
       }
 
-      const result = await response.json();
+      await response.json();
 
       setBoard(prev => {
         if (!prev) return null;
