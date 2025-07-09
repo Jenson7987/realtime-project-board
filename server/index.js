@@ -257,6 +257,14 @@ io.on('connection', (socket) => {
 
   // Card movement is now handled through the API route, which emits the appropriate events
 
+  // Test event handler
+  socket.on('test', (data) => {
+    console.log('Received test event from client:', data);
+    console.log('Client socket ID:', socket.id);
+    console.log('Client username:', socket.user.username);
+    socket.emit('testResponse', { message: 'Hello from server', received: data });
+  });
+
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.user.username);
   });

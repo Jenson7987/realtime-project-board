@@ -107,11 +107,19 @@ const BoardView: React.FC = () => {
     if (socket.connected) {
       console.log('Joining board room:', board._id);
       socket.emit('joinBoard', board._id);
+      
+      // Test socket communication
+      console.log('Testing socket communication...');
+      socket.emit('test', { message: 'Hello from client', boardId: board._id });
     } else {
       console.log('Socket not connected, waiting for connection...');
       socket.on('connect', () => {
         console.log('Socket connected, now joining board room:', board._id);
         socket.emit('joinBoard', board._id);
+        
+        // Test socket communication
+        console.log('Testing socket communication...');
+        socket.emit('test', { message: 'Hello from client', boardId: board._id });
       });
     }
 
@@ -218,6 +226,19 @@ const BoardView: React.FC = () => {
     socket.on('columnUpdated', handleColumnUpdate);
     socket.on('columnCreated', handleColumnCreate);
     socket.on('columnDeleted', handleColumnDelete);
+    
+    // Test socket connection
+    socket.on('connect', () => {
+      console.log('Socket connected in BoardView, ID:', socket.id);
+    });
+    
+    socket.on('disconnect', () => {
+      console.log('Socket disconnected in BoardView');
+    });
+    
+    socket.on('testResponse', (data) => {
+      console.log('Received test response from server:', data);
+    });
 
     // Cleanup function
     return () => {

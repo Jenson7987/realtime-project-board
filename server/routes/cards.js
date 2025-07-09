@@ -149,6 +149,13 @@ router.put('/:boardId/:cardId', auth, async (req, res) => {
     // Also emit the full updated board state for drag-and-drop operations
     if (columnId !== undefined || position !== undefined) {
       console.log('Emitting cardsUpdated event for drag-and-drop');
+      console.log('Board ID:', boardId.toString());
+      console.log('Number of cards:', board.cards.length);
+      
+      // Get the room to see how many clients are connected
+      const room = req.app.get('io').sockets.adapter.rooms.get(boardId.toString());
+      console.log(`Number of clients in room ${boardId}:`, room ? room.size : 0);
+      
       req.app.get('io').to(boardId.toString()).emit('cardsUpdated', {
         boardId: boardId.toString(),
         cards: board.cards
