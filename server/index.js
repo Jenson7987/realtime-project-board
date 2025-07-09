@@ -18,7 +18,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: ["https://realtime-project-board.netlify.app", "http://localhost:3000"],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
     allowedHeaders: ["Authorization"]
@@ -40,7 +40,10 @@ const PORT = process.env.PORT || 3001;
 const Board = require('./models/Board');
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ["https://realtime-project-board.netlify.app", "http://localhost:3000"],
+  credentials: true
+}));
 app.use(express.json());
 
 // Routes
