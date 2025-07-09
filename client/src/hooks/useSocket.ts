@@ -15,7 +15,6 @@ export const useSocket = () => {
 
     // Only create a new socket if one doesn't exist
     if (!socketRef.current) {
-      console.log('Initializing socket connection to:', BACKEND_URL);
       socketRef.current = io(BACKEND_URL, {
         transports: ['polling', 'websocket'],
         auth: {
@@ -31,24 +30,16 @@ export const useSocket = () => {
       });
 
       socketRef.current.on('connect', () => {
-        console.log('Socket connected successfully');
-        console.log('Socket ID:', socketRef.current?.id);
-        console.log('Socket connected to:', BACKEND_URL);
         // Join a room specific to this tab
         socketRef.current?.emit('joinTab', { tabId });
       });
 
       socketRef.current.on('connect_error', (error) => {
         console.error('Socket connection error:', error.message);
-        console.error('Socket connection error details:', {
-          message: error.message,
-          url: BACKEND_URL,
-          error: error
-        });
       });
 
       socketRef.current.on('disconnect', (reason) => {
-        console.log('Socket disconnected:', reason);
+        // Socket disconnected
       });
 
       socketRef.current.on('error', (error) => {
@@ -59,7 +50,6 @@ export const useSocket = () => {
     // Cleanup function
     return () => {
       if (socketRef.current) {
-        console.log('Cleaning up socket connection...');
         socketRef.current.disconnect();
         socketRef.current = null;
       }

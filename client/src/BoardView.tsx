@@ -55,7 +55,6 @@ const BoardView: React.FC = () => {
     }
 
     const fetchBoard = async () => {
-      console.log('Fetching board with username/slug:', { username, slug });
       try {
         let response;
         
@@ -72,7 +71,6 @@ const BoardView: React.FC = () => {
           return;
         }
 
-        console.log('Response status:', response.status);
         if (!response.ok) {
           if (response.status === 404) {
             navigate('/');
@@ -82,27 +80,8 @@ const BoardView: React.FC = () => {
         }
 
         const data = await response.json();
-        console.log('Received data:', data);
 
         if (data.board) {
-          console.log('Setting board state:', {
-            boardId: data.board._id,
-            title: data.board.title,
-            columnsCount: data.board.columns?.length || 0,
-            cardsCount: data.board.cards?.length || 0,
-            columns: data.board.columns?.map((col: any) => ({
-              _id: col._id,
-              title: col.title,
-              _idType: typeof col._id
-            })) || [],
-            cards: data.board.cards?.map((card: any) => ({
-              _id: card._id,
-              title: card.title,
-              columnId: card.columnId,
-              columnIdType: typeof card.columnId,
-              position: card.position
-            })) || []
-          });
           setBoard(data.board);
         } else {
           console.error('No board data in response');
@@ -120,26 +99,12 @@ const BoardView: React.FC = () => {
 
   useEffect(() => {
     if (!socket || !board) return;
-
-    console.log('Socket connection status:', socket.connected);
-    console.log('Socket ID:', socket.id);
     
     if (socket.connected) {
-      console.log('Joining board room:', board._id);
       socket.emit('joinBoard', board._id);
-      
-      // Test socket communication
-      console.log('Testing socket communication...');
-      socket.emit('test', { message: 'Hello from client', boardId: board._id });
     } else {
-      console.log('Socket not connected, waiting for connection...');
       socket.on('connect', () => {
-        console.log('Socket connected, now joining board room:', board._id);
         socket.emit('joinBoard', board._id);
-        
-        // Test socket communication
-        console.log('Testing socket communication...');
-        socket.emit('test', { message: 'Hello from client', boardId: board._id });
       });
     }
 
@@ -150,7 +115,6 @@ const BoardView: React.FC = () => {
 
     // Cleanup function
     return () => {
-      console.log('Leaving board room:', board._id);
       socket.emit('leaveBoard', board._id);
     };
   }, [socket, board]);
@@ -158,10 +122,7 @@ const BoardView: React.FC = () => {
   useEffect(() => {
     if (!socket) return;
 
-    console.log('Setting up socket event listeners for socket ID:', socket.id);
-
     const handleCardUpdate = (data: { boardId: string; card: Card }) => {
-      console.log('Received cardUpdated event:', data);
       setBoard(prev => {
         if (!prev) return null;
         return {
@@ -174,7 +135,6 @@ const BoardView: React.FC = () => {
     };
 
     const handleCardCreate = (data: { boardId: string; card: Card }) => {
-      console.log('Received cardCreated event:', data);
       setBoard(prev => {
         if (!prev) return null;
         return {
@@ -185,7 +145,6 @@ const BoardView: React.FC = () => {
     };
 
     const handleCardDelete = (data: { boardId: string; cardId: string }) => {
-      console.log('Received cardDeleted event:', data);
       setBoard(prev => {
         if (!prev) return null;
         return {
@@ -196,11 +155,8 @@ const BoardView: React.FC = () => {
     };
 
     const handleCardsUpdate = (data: { boardId: string; cards: Card[] }) => {
-      console.log('Received cardsUpdated event:', data);
-      console.log('Number of cards received:', data.cards.length);
       setBoard(prev => {
         if (!prev) return null;
-        console.log('Updating board with new cards');
         return {
           ...prev,
           cards: data.cards
@@ -209,7 +165,6 @@ const BoardView: React.FC = () => {
     };
 
     const handleColumnUpdate = (data: { columnId: string; title: string }) => {
-      console.log('Received columnUpdated event:', data);
       setBoard(prev => {
         if (!prev) return null;
         return {
@@ -222,7 +177,6 @@ const BoardView: React.FC = () => {
     };
 
     const handleColumnCreate = (data: { boardId: string; column: Column }) => {
-      console.log('Received columnCreated event:', data);
       setBoard(prev => {
         if (!prev) return null;
         return {
@@ -233,7 +187,6 @@ const BoardView: React.FC = () => {
     };
 
     const handleColumnDelete = (data: { boardId: string; columnId: string }) => {
-      console.log('Received columnDeleted event:', data);
       setBoard(prev => {
         if (!prev) return null;
         return {
@@ -252,28 +205,8 @@ const BoardView: React.FC = () => {
     socket.on('columnCreated', handleColumnCreate);
     socket.on('columnDeleted', handleColumnDelete);
     
-    // Test socket connection
-    socket.on('connect', () => {
-      console.log('Socket connected in BoardView, ID:', socket.id);
-    });
-    
-    socket.on('disconnect', () => {
-      console.log('Socket disconnected in BoardView');
-    });
-    
-    socket.on('testResponse', (data) => {
-      console.log('Received test response from server:', data);
-    });
-
-    // Test real-time updates
-    socket.on('testCardUpdate', (data) => {
-      console.log('Received test card update:', data);
-      alert('Test card update received!');
-    });
-
     // Cleanup function
     return () => {
-      console.log('Cleaning up socket event listeners');
       socket.off('cardUpdated', handleCardUpdate);
       socket.off('cardCreated', handleCardCreate);
       socket.off('cardDeleted', handleCardDelete);
@@ -359,7 +292,6 @@ const BoardView: React.FC = () => {
 
       // Get the updated card from the response
       const updatedCard = await response.json();
-      console.log('Card position updated successfully:', updatedCard);
       
       // Update UI with the server response as fallback
       setBoard(prev => {
@@ -422,7 +354,6 @@ const BoardView: React.FC = () => {
       if (!response.ok) throw new Error('Failed to create card');
       
       const createdCard = await response.json();
-      console.log('Card created successfully:', createdCard);
       
       // Update UI immediately as fallback in case socket doesn't work
       setBoard(prev => {
@@ -612,27 +543,22 @@ const BoardView: React.FC = () => {
   };
 
   const startEditingColumn = (columnId: string, currentTitle: string) => {
-    console.log('Starting to edit column:', columnId, 'with title:', currentTitle);
     setEditingColumnId(columnId);
     setEditingColumnTitle(currentTitle);
   };
 
   const cancelEditingColumn = () => {
-    console.log('Canceling column editing');
     setEditingColumnId(null);
     setEditingColumnTitle('');
   };
 
   const handleUpdateColumnTitle = async (newTitle: string) => {
-    console.log('Updating column title:', editingColumnId, 'to:', newTitle);
     if (!editingColumnId || !board) {
-      console.log('Missing editingColumnId or board:', { editingColumnId, board: !!board });
       return;
     }
     
     try {
       const url = `${API_BASE_URL}/boards/${board._id}/columns/${editingColumnId}`;
-      console.log('Making request to:', url);
       
       const response = await fetch(url, {
         method: 'PUT',
@@ -642,8 +568,6 @@ const BoardView: React.FC = () => {
         },
         body: JSON.stringify({ title: newTitle })
       });
-
-      console.log('Response status:', response.status);
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -652,7 +576,6 @@ const BoardView: React.FC = () => {
       }
 
       const result = await response.json();
-      console.log('Update successful:', result);
 
       setBoard(prev => {
         if (!prev) return null;
@@ -946,17 +869,6 @@ const BoardView: React.FC = () => {
               const columnCards = board.cards.filter(card => card.columnId.toString() === col._id.toString());
               const isEmpty = columnCards.length === 0;
               
-              console.log(`Column ${col.title} (${col._id}):`, {
-                columnId: col._id,
-                cardsInColumn: columnCards.length,
-                cards: columnCards.map(card => ({
-                  _id: card._id,
-                  title: card.title,
-                  columnId: card.columnId,
-                  position: card.position
-                }))
-              });
-              
               return (
                 <Droppable droppableId={col._id} key={col._id}>
                   {(provided, snapshot) => (
@@ -1080,57 +992,7 @@ const BoardView: React.FC = () => {
               <span>Add Column</span>
             </button>
             
-            {/* Test button for real-time updates */}
-            {board && socket && (
-              <button
-                className="test-button"
-                onClick={() => {
-                  console.log('Sending test card update...');
-                  socket.emit('testCardUpdate', { 
-                    boardId: board._id, 
-                    message: 'Test from ' + new Date().toLocaleTimeString() 
-                  });
-                }}
-                style={{
-                  marginLeft: '10px',
-                  padding: '8px 16px',
-                  backgroundColor: '#ff6b6b',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer'
-                }}
-              >
-                Test Real-time
-              </button>
-            )}
-            
-            {/* Socket connection status */}
-            <div style={{
-              marginLeft: '10px',
-              padding: '8px 16px',
-              backgroundColor: socket?.connected ? '#4CAF50' : '#f44336',
-              color: 'white',
-              borderRadius: '4px',
-              fontSize: '12px'
-            }}>
-              Socket: {socket?.connected ? 'Connected' : 'Disconnected'}
-            </div>
-            
-            {/* Environment variable debug */}
-            <div style={{
-              marginLeft: '10px',
-              padding: '8px 16px',
-              backgroundColor: '#2196F3',
-              color: 'white',
-              borderRadius: '4px',
-              fontSize: '10px',
-              maxWidth: '200px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }} title={process.env.REACT_APP_API_URL || 'Not set'}>
-              API: {process.env.REACT_APP_API_URL ? 'Set' : 'Not set'}
-            </div>
+
           </div>
         </DragDropContext>
       </main>

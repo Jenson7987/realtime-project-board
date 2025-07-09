@@ -63,30 +63,20 @@ app.use('/api/cards', cardRoutes);
 // Socket.io authentication middleware
 io.use(async (socket, next) => {
   try {
-    console.log('=== SOCKET AUTH ATTEMPT ===');
     const token = socket.handshake.auth.token;
-    console.log('Socket auth attempt with token:', token ? 'present' : 'missing');
-    console.log('Socket handshake auth:', socket.handshake.auth);
     
     if (!token) {
-      console.log('No token provided for socket connection');
       return next(new Error('Authentication error'));
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('Socket token decoded:', decoded);
-    
     const user = await User.findById(decoded.userId).select('-password');
-    console.log('Socket user found:', user ? 'yes' : 'no');
-    console.log('User details:', user ? { username: user.username, id: user._id } : 'none');
     
     if (!user) {
-      console.log('User not found for socket connection');
       return next(new Error('User not found'));
     }
 
     socket.user = user;
-    console.log('=== SOCKET AUTH SUCCESS ===');
     next();
   } catch (error) {
     console.error('Socket authentication error:', error);
@@ -96,18 +86,11 @@ io.use(async (socket, next) => {
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
-  console.log('=== SOCKET CONNECTION ESTABLISHED ===');
   console.log('Client connected:', socket.user.username);
-  console.log('Socket ID:', socket.id);
-  console.log('Total connected clients:', io.engine.clientsCount);
 
   // Join a board room
   socket.on('joinBoard', async (boardId) => {
     try {
-      console.log('=== JOIN BOARD ATTEMPT ===');
-      console.log(`User ${socket.user.username} attempting to join board: ${boardId}`);
-      console.log(`Socket ID: ${socket.id}`);
-      
       const board = await Board.findOne({
         _id: boardId,
         $or: [
@@ -117,18 +100,10 @@ io.on('connection', (socket) => {
       });
 
       if (!board) {
-        console.log(`Access denied for user ${socket.user.username} to board ${boardId}`);
         return socket.emit('error', 'Access denied');
       }
 
       socket.join(boardId.toString());
-      console.log(`${socket.user.username} successfully joined board: ${boardId}`);
-      console.log(`Socket rooms after join:`, Array.from(socket.rooms));
-      
-      // Log room information
-      const room = io.sockets.adapter.rooms.get(boardId.toString());
-      console.log(`Number of clients in room ${boardId}:`, room ? room.size : 0);
-      console.log('=== JOIN BOARD SUCCESS ===');
     } catch (error) {
       console.error('Error joining board:', error);
       socket.emit('error', 'Failed to join board');
@@ -138,7 +113,6 @@ io.on('connection', (socket) => {
   // Leave a board room
   socket.on('leaveBoard', (boardId) => {
     socket.leave(boardId.toString());
-    console.log(`${socket.user.username} left board: ${boardId}`);
   });
 
   // Handle card updates
@@ -275,36 +249,8 @@ io.on('connection', (socket) => {
 
   // Card movement is now handled through the API route, which emits the appropriate events
 
-  // Test event handler
-  socket.on('test', (data) => {
-    console.log('Received test event from client:', data);
-    console.log('Client socket ID:', socket.id);
-    console.log('Client username:', socket.user.username);
-    socket.emit('testResponse', { message: 'Hello from server', received: data });
-  });
-
-  // Test card update event handler
-  socket.on('testCardUpdate', (data) => {
-    console.log('Received testCardUpdate event from client:', data);
-    console.log('Client socket ID:', socket.id);
-    console.log('Client username:', socket.user.username);
-    
-    // Broadcast to all other clients in the same board room
-    socket.to(data.boardId.toString()).emit('testCardUpdate', {
-      boardId: data.boardId,
-      message: data.message,
-      fromUser: socket.user.username,
-      timestamp: new Date().toISOString()
-    });
-    
-    console.log('testCardUpdate event broadcasted to room:', data.boardId);
-  });
-
   socket.on('disconnect', () => {
-    console.log('=== SOCKET DISCONNECTED ===');
     console.log('Client disconnected:', socket.user.username);
-    console.log('Socket ID:', socket.id);
-    console.log('Total connected clients:', io.engine.clientsCount);
   });
 });
 
