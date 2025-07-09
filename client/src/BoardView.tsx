@@ -1116,6 +1116,21 @@ const BoardView: React.FC = () => {
             }}>
               Socket: {socket?.connected ? 'Connected' : 'Disconnected'}
             </div>
+            
+            {/* Environment variable debug */}
+            <div style={{
+              marginLeft: '10px',
+              padding: '8px 16px',
+              backgroundColor: '#2196F3',
+              color: 'white',
+              borderRadius: '4px',
+              fontSize: '10px',
+              maxWidth: '200px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }} title={process.env.REACT_APP_API_URL || 'Not set'}>
+              API: {process.env.REACT_APP_API_URL ? 'Set' : 'Not set'}
+            </div>
           </div>
         </DragDropContext>
       </main>

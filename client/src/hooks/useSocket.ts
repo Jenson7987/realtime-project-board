@@ -40,6 +40,11 @@ export const useSocket = () => {
 
       socketRef.current.on('connect_error', (error) => {
         console.error('Socket connection error:', error.message);
+        console.error('Socket connection error details:', {
+          message: error.message,
+          url: BACKEND_URL,
+          error: error
+        });
       });
 
       socketRef.current.on('disconnect', (reason) => {
