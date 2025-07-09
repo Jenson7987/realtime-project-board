@@ -265,6 +265,23 @@ io.on('connection', (socket) => {
     socket.emit('testResponse', { message: 'Hello from server', received: data });
   });
 
+  // Test card update event handler
+  socket.on('testCardUpdate', (data) => {
+    console.log('Received testCardUpdate event from client:', data);
+    console.log('Client socket ID:', socket.id);
+    console.log('Client username:', socket.user.username);
+    
+    // Broadcast to all other clients in the same board room
+    socket.to(data.boardId.toString()).emit('testCardUpdate', {
+      boardId: data.boardId,
+      message: data.message,
+      fromUser: socket.user.username,
+      timestamp: new Date().toISOString()
+    });
+    
+    console.log('testCardUpdate event broadcasted to room:', data.boardId);
+  });
+
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.user.username);
   });

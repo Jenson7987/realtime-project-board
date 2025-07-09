@@ -143,6 +143,11 @@ const BoardView: React.FC = () => {
       });
     }
 
+    // Add listener for joinBoard response
+    socket.on('error', (error) => {
+      console.error('Socket error in BoardView:', error);
+    });
+
     // Cleanup function
     return () => {
       console.log('Leaving board room:', board._id);
@@ -258,6 +263,12 @@ const BoardView: React.FC = () => {
     
     socket.on('testResponse', (data) => {
       console.log('Received test response from server:', data);
+    });
+
+    // Test real-time updates
+    socket.on('testCardUpdate', (data) => {
+      console.log('Received test card update:', data);
+      alert('Test card update received!');
     });
 
     // Cleanup function
@@ -1068,6 +1079,31 @@ const BoardView: React.FC = () => {
               </svg>
               <span>Add Column</span>
             </button>
+            
+            {/* Test button for real-time updates */}
+            {board && socket && (
+              <button
+                className="test-button"
+                onClick={() => {
+                  console.log('Sending test card update...');
+                  socket.emit('testCardUpdate', { 
+                    boardId: board._id, 
+                    message: 'Test from ' + new Date().toLocaleTimeString() 
+                  });
+                }}
+                style={{
+                  marginLeft: '10px',
+                  padding: '8px 16px',
+                  backgroundColor: '#ff6b6b',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Test Real-time
+              </button>
+            )}
           </div>
         </DragDropContext>
       </main>

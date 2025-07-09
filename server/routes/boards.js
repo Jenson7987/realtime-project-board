@@ -145,11 +145,41 @@ router.get('/:username/:slug', auth, async (req, res) => {
       }
     });
 
+    // Check for orphaned cards (cards with non-existent column IDs)
+    const columnIds = board.columns.map(col => col._id.toString());
+    const orphanedCards = board.cards.filter(card => !columnIds.includes(card.columnId.toString()));
+    
+    // Fix orphaned cards by moving them to the first column
+    if (orphanedCards.length > 0 && board.columns.length > 0) {
+      console.log('Found orphaned cards, fixing them...');
+      const firstColumnId = board.columns[0]._id.toString();
+      
+      board.cards.forEach(card => {
+        if (!columnIds.includes(card.columnId.toString())) {
+          console.log(`Moving orphaned card "${card.title}" to first column`);
+          card.columnId = firstColumnId;
+        }
+      });
+      
+      await board.save();
+      console.log('Board saved with fixed orphaned cards');
+    }
+    
     console.log('Sending board response:', {
       boardId: board._id,
       title: board.title,
       columnsCount: board.columns.length,
+      columns: board.columns.map(col => ({
+        _id: col._id,
+        title: col.title
+      })),
       cardsCount: board.cards.length,
+      orphanedCardsCount: orphanedCards.length,
+      orphanedCards: orphanedCards.map(card => ({
+        _id: card._id,
+        title: card.title,
+        columnId: card.columnId
+      })),
       cards: board.cards.map(card => ({
         _id: card._id,
         title: card.title,
@@ -709,17 +739,19 @@ router.post('/', auth, async (req, res) => {
 
     // Create sample cards if requested
     let cards = [];
+    let finalColumns = safeColumns;
+    
     if (sampleCards) {
       const todoColumnId = new mongoose.Types.ObjectId();
       const inProgressColumnId = new mongoose.Types.ObjectId();
       const doneColumnId = new mongoose.Types.ObjectId();
 
-      // Update column IDs to use the actual IDs
-      if (safeColumns && safeColumns.length >= 3) {
-        safeColumns[0]._id = todoColumnId;
-        safeColumns[1]._id = inProgressColumnId;
-        safeColumns[2]._id = doneColumnId;
-      }
+      // Create default columns with the same IDs used for cards
+      finalColumns = [
+        { _id: todoColumnId, title: 'To Do', position: 0 },
+        { _id: inProgressColumnId, title: 'In Progress', position: 1 },
+        { _id: doneColumnId, title: 'Done', position: 2 },
+      ];
 
       cards = [
         {
@@ -762,6 +794,7 @@ router.post('/', auth, async (req, res) => {
       
       console.log('Sample cards created with user info:', cards.map(card => ({
         title: card.title,
+        columnId: card.columnId,
         createdBy: card.createdBy,
         modifiedBy: card.modifiedBy
       })));
@@ -772,7 +805,7 @@ router.post('/', auth, async (req, res) => {
       slug,
       owner: req.user._id,
       ownerUsername: req.user.username,
-      columns: safeColumns || [
+      columns: finalColumns || [
         { _id: new mongoose.Types.ObjectId(), title: 'To Do', position: 0 },
         { _id: new mongoose.Types.ObjectId(), title: 'In Progress', position: 1 },
         { _id: new mongoose.Types.ObjectId(), title: 'Done', position: 2 },

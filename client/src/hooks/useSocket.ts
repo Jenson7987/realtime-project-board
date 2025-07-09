@@ -32,6 +32,8 @@ export const useSocket = () => {
 
       socketRef.current.on('connect', () => {
         console.log('Socket connected successfully');
+        console.log('Socket ID:', socketRef.current?.id);
+        console.log('Socket connected to:', BACKEND_URL);
         // Join a room specific to this tab
         socketRef.current?.emit('joinTab', { tabId });
       });

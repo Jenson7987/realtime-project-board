@@ -8,5 +8,6 @@ export const BACKEND_URL = process.env.REACT_APP_API_URL?.replace('/api', '') ||
 console.log('Config loaded:', {
   API_BASE_URL,
   BACKEND_URL,
-  NODE_ENV: process.env.NODE_ENV
+  NODE_ENV: process.env.NODE_ENV,
+  REACT_APP_API_URL: process.env.REACT_APP_API_URL
 }); 
