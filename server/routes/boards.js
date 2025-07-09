@@ -145,6 +145,19 @@ router.get('/:username/:slug', auth, async (req, res) => {
       }
     });
 
+    console.log('Sending board response:', {
+      boardId: board._id,
+      title: board.title,
+      columnsCount: board.columns.length,
+      cardsCount: board.cards.length,
+      cards: board.cards.map(card => ({
+        _id: card._id,
+        title: card.title,
+        columnId: card.columnId,
+        position: card.position
+      }))
+    });
+
     res.json({ board });
   } catch (err) {
     console.error('Error fetching board by username/slug:', err);

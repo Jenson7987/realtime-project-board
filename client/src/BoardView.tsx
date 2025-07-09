@@ -85,7 +85,27 @@ const BoardView: React.FC = () => {
         console.log('Received data:', data);
 
         if (data.board) {
+          console.log('Setting board state:', {
+            boardId: data.board._id,
+            title: data.board.title,
+            columnsCount: data.board.columns?.length || 0,
+            cardsCount: data.board.cards?.length || 0,
+            columns: data.board.columns?.map((col: any) => ({
+              _id: col._id,
+              title: col.title,
+              _idType: typeof col._id
+            })) || [],
+            cards: data.board.cards?.map((card: any) => ({
+              _id: card._id,
+              title: card.title,
+              columnId: card.columnId,
+              columnIdType: typeof card.columnId,
+              position: card.position
+            })) || []
+          });
           setBoard(data.board);
+        } else {
+          console.error('No board data in response');
         }
       } catch (err) {
         console.error('Error fetching board:', err);
@@ -272,8 +292,9 @@ const BoardView: React.FC = () => {
 
     const columnsMap: Record<string, Card[]> = {};
     cardsCopy.forEach(c => {
-      if (!columnsMap[c.columnId]) columnsMap[c.columnId] = [];
-      columnsMap[c.columnId].push(c);
+      const columnIdStr = c.columnId.toString();
+      if (!columnsMap[columnIdStr]) columnsMap[columnIdStr] = [];
+      columnsMap[columnIdStr].push(c);
     });
     Object.values(columnsMap).forEach(list => list.sort((a, b) => a.position - b.position));
 
@@ -369,7 +390,7 @@ const BoardView: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const columnCards = board.cards.filter(c => c.columnId === addCardColumnId);
+      const columnCards = board.cards.filter(c => c.columnId.toString() === addCardColumnId.toString());
       const maxPosition = Math.max(...columnCards.map(c => c.position), -1);
       
       const response = await fetch(`${API_BASE_URL}/cards`, {
@@ -910,8 +931,20 @@ const BoardView: React.FC = () => {
         <DragDropContext onDragEnd={onDragEnd}>
           <div className="board-columns">
             {board.columns.map((col) => {
-              const columnCards = board.cards.filter(card => card.columnId === col._id);
+              // Convert both IDs to strings for comparison to handle ObjectId vs string mismatch
+              const columnCards = board.cards.filter(card => card.columnId.toString() === col._id.toString());
               const isEmpty = columnCards.length === 0;
+              
+              console.log(`Column ${col.title} (${col._id}):`, {
+                columnId: col._id,
+                cardsInColumn: columnCards.length,
+                cards: columnCards.map(card => ({
+                  _id: card._id,
+                  title: card.title,
+                  columnId: card.columnId,
+                  position: card.position
+                }))
+              });
               
               return (
                 <Droppable droppableId={col._id} key={col._id}>
