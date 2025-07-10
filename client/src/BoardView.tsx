@@ -46,7 +46,6 @@ const BoardView: React.FC = () => {
   const editRef = useRef<HTMLInputElement>(null);
   
   useEffect(() => {
-    // Wait for authentication to finish loading
     if (isLoading) return;
     
     if (!isAuthenticated) {
@@ -59,14 +58,12 @@ const BoardView: React.FC = () => {
         let response;
         
         if (username && slug) {
-          // Fetch specific board by username and slug
           response = await fetch(`${API_BASE_URL}/boards/${username}/${slug}`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
           });
         } else {
-          // Fallback: redirect to home
           navigate('/');
           return;
         }
@@ -108,12 +105,10 @@ const BoardView: React.FC = () => {
       });
     }
 
-    // Add listener for joinBoard response
     socket.on('error', (error) => {
       console.error('Socket error in BoardView:', error);
     });
 
-    // Cleanup function
     return () => {
       socket.emit('leaveBoard', board._id);
     };
@@ -205,7 +200,6 @@ const BoardView: React.FC = () => {
     socket.on('columnCreated', handleColumnCreate);
     socket.on('columnDeleted', handleColumnDelete);
     
-    // Cleanup function
     return () => {
       socket.off('cardUpdated', handleCardUpdate);
       socket.off('cardCreated', handleCardCreate);
@@ -215,7 +209,7 @@ const BoardView: React.FC = () => {
       socket.off('columnCreated', handleColumnCreate);
       socket.off('columnDeleted', handleColumnDelete);
     };
-  }, [socket]); // Only depend on socket, not board
+  }, [socket]);
 
   const onDragEnd = async (result: DropResult) => {
     const { destination, source, draggableId } = result;
@@ -229,50 +223,6 @@ const BoardView: React.FC = () => {
       return;
     }
 
-    const prevCards = board.cards;
-    const cardsCopy = board.cards.map(c => ({ ...c }));
-    const movingCard = cardsCopy.find(c => c._id === draggableId);
-    if (!movingCard) return;
-
-    const columnsMap: Record<string, Card[]> = {};
-    cardsCopy.forEach(c => {
-      const columnIdStr = c.columnId.toString();
-      if (!columnsMap[columnIdStr]) columnsMap[columnIdStr] = [];
-      columnsMap[columnIdStr].push(c);
-    });
-    Object.values(columnsMap).forEach(list => list.sort((a, b) => a.position - b.position));
-
-    const sourceList = columnsMap[source.droppableId];
-    const destList = columnsMap[destination.droppableId] || (columnsMap[destination.droppableId] = []);
-    
-
-    const toColumn = destination.droppableId;
-
-    // Update the moved card with its new location
-    movingCard.columnId = toColumn;
-    movingCard.position = destination.index;
-
-    const currentIndex = sourceList.findIndex(c => c._id === draggableId);
-    if (currentIndex === -1) return;
-    sourceList.splice(currentIndex, 1);
-
-    let destIdx = destination.index;
-    if (destIdx > destList.length) destIdx = destList.length;
-    destList.splice(destIdx, 0, movingCard);
-
-    Object.entries(columnsMap).forEach(([colId, list]) => {
-      list.forEach((c, idx) => {
-        c.columnId = colId;
-        c.position = idx;
-      });
-    });
-
-    const updatedCards = Object.values(columnsMap).flat();
-    
-    // Optimistically update UI
-    setBoard(prev => (prev ? { ...prev, cards: updatedCards } : prev));
-
-    // Persist change to server
     try {
       const response = await fetch(`${API_BASE_URL}/cards/${board._id}/${draggableId}`, {
         method: 'PUT',
@@ -289,27 +239,8 @@ const BoardView: React.FC = () => {
       if (!response.ok) {
         throw new Error('Failed to update card position');
       }
-
-      // Get the updated card from the response
-      const updatedCard = await response.json();
-      
-      // Update UI with the server response as fallback
-      setBoard(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          cards: prev.cards.map(card => 
-            card._id === draggableId ? updatedCard : card
-          )
-        };
-      });
-
-      // The API call above will trigger socket events to update other clients
-      // No need to manually emit moveCard event
     } catch (error) {
       console.error('Error updating card position:', error);
-      // Revert optimistic update if something went wrong
-      setBoard(prev => (prev ? { ...prev, cards: prevCards } : prev));
     }
   };
 
@@ -353,17 +284,6 @@ const BoardView: React.FC = () => {
 
       if (!response.ok) throw new Error('Failed to create card');
       
-      const createdCard = await response.json();
-      
-      // Update UI immediately as fallback in case socket doesn't work
-      setBoard(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          cards: [...prev.cards, createdCard]
-        };
-      });
-      
       closeAddCardModal();
     } catch (error) {
       console.error('Error creating card:', error);
@@ -404,8 +324,6 @@ const BoardView: React.FC = () => {
         throw new Error('Failed to add column');
       }
 
-      // Don't manually update state - let the socket event handle it
-      // This ensures both users see the same result
       setNewColumnName('');
       closeAddColumnModal();
     } catch (error) {
@@ -451,18 +369,6 @@ const BoardView: React.FC = () => {
 
       if (!response.ok) throw new Error('Failed to update card');
       
-      const updatedCard = await response.json();
-      
-      setBoard(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          cards: prev.cards.map(card => 
-            card._id === selectedCard._id ? updatedCard : card
-          )
-        };
-      });
-      
       closeCardModal();
     } catch (error) {
       console.error('Error updating card:', error);
@@ -492,14 +398,6 @@ const BoardView: React.FC = () => {
         const message = errorData?.error || 'Failed to delete card';
         throw new Error(message);
       }
-      
-      setBoard(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          cards: prev.cards.filter(card => card._id !== selectedCard._id)
-        };
-      });
       
       closeCardModal();
     } catch (error) {
@@ -532,9 +430,6 @@ const BoardView: React.FC = () => {
       });
 
       if (!response.ok) throw new Error('Failed to delete column');
-      
-      // Don't manually update state - let the socket event handle it
-      // This ensures both users see the same result
       
       setIsDeletingColumn(null);
     } catch (error) {
@@ -574,27 +469,6 @@ const BoardView: React.FC = () => {
         console.error('Error response:', errorText);
         throw new Error('Failed to update column title');
       }
-
-      await response.json();
-
-      setBoard(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          columns: prev.columns.map(col => 
-            col._id === editingColumnId ? { ...col, title: newTitle } : col
-          )
-        };
-      });
-
-      // Emit socket event for real-time updates
-      if (socket) {
-        socket.emit('columnUpdated', {
-          boardId: board._id,
-          columnId: editingColumnId,
-          title: newTitle
-        });
-      }
     } catch (err) {
       console.error('Error updating column title:', err);
     } finally {
@@ -623,7 +497,6 @@ const BoardView: React.FC = () => {
         throw new Error('Failed to delete board');
       }
 
-      // Navigate back to home after successful deletion
       navigate('/');
     } catch (err) {
       console.error('Error deleting board:', err);
@@ -635,7 +508,6 @@ const BoardView: React.FC = () => {
     }
   };
 
-  // Focus the edit field when it becomes active
   useEffect(() => {
     if (editingColumnId && editRef.current) {
       editRef.current.focus();
@@ -643,7 +515,6 @@ const BoardView: React.FC = () => {
     }
   }, [editingColumnId]);
 
-  // Close user menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
@@ -661,7 +532,6 @@ const BoardView: React.FC = () => {
     };
   }, [showUserMenu]);
 
-  // Close board menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
@@ -865,7 +735,6 @@ const BoardView: React.FC = () => {
         <DragDropContext onDragEnd={onDragEnd}>
           <div className="board-columns">
             {board.columns.map((col) => {
-              // Convert both IDs to strings for comparison to handle ObjectId vs string mismatch
               const columnCards = board.cards.filter(card => card.columnId.toString() === col._id.toString());
               const isEmpty = columnCards.length === 0;
               

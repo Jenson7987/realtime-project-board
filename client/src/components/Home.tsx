@@ -134,21 +134,20 @@ const Home: React.FC = () => {
         </div>
       </div>
 
-      {/* Hero Section */}
+      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="text-center mb-16">
-          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-            Organise Your Work with
-            <span className="text-blue-700"> Real-Time Collaboration</span>
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+            Project Board
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
-            Create beautiful project boards, collaborate with your team in real-time, and stay organised with our intuitive drag-and-drop interface.
+            Create kanban boards with real-time collaboration. Drag and drop cards, edit titles and descriptions, and share boards with your team.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
             {user ? (
               <Link
                 to="/boards"
-                className="bg-blue-600 text-white font-semibold rounded-xl px-8 py-4 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105"
+                className="bg-blue-600 text-white font-semibold rounded-xl px-8 py-4 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200"
               >
                 Go to My Boards
               </Link>
@@ -156,13 +155,13 @@ const Home: React.FC = () => {
               <>
                 <Link
                   to="/register"
-                  className="bg-blue-600 text-white font-semibold rounded-xl px-8 py-4 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105"
+                  className="bg-blue-600 text-white font-semibold rounded-xl px-8 py-4 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200"
                 >
-                  Get Started Free
+                  Get Started
                 </Link>
                 <Link
                   to="/login"
-                  className="bg-white text-gray-700 font-semibold rounded-xl px-8 py-4 border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105"
+                  className="bg-white text-gray-700 font-semibold rounded-xl px-8 py-4 border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200"
                 >
                   Sign In
                 </Link>
@@ -172,7 +171,7 @@ const Home: React.FC = () => {
         </div>
 
         {/* Features Section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
           <div className="text-center">
             <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
               <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -181,7 +180,7 @@ const Home: React.FC = () => {
             </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-4">Real-Time Updates</h3>
             <p className="text-gray-600">
-              See changes instantly as your team collaborates. No more refreshing or losing track of updates.
+              See changes instantly as you and your team collaborate. Cards move, edit, and update in real-time across all devices.
             </p>
           </div>
           <div className="text-center">
@@ -192,7 +191,7 @@ const Home: React.FC = () => {
             </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-4">Drag & Drop</h3>
             <p className="text-gray-600">
-              Intuitive drag-and-drop interface makes organising tasks effortless. Move cards between columns with ease.
+              Move cards between columns with intuitive drag and drop. Reorder cards within columns and organize your workflow visually.
             </p>
           </div>
           <div className="text-center">
@@ -201,37 +200,77 @@ const Home: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">Team Collaboration</h3>
+            <h3 className="text-xl font-semibold text-gray-900 mb-4">Board Sharing</h3>
             <p className="text-gray-600">
-              Work together seamlessly with your team. Share boards, assign tasks, and track progress in real-time.
+              Share boards with team members for collaboration. Add and remove columns, edit card details, and manage board access.
             </p>
           </div>
         </div>
 
-        {/* CTA Section */}
-        <div className="text-center">
-          <div className="bg-white rounded-3xl shadow-xl p-12 max-w-4xl mx-auto">
-            <h2 className="text-3xl font-bold text-gray-900 mb-6">
-              Ready to Get Started?
-            </h2>
-            <p className="text-lg text-gray-600 mb-8">
-              Join thousands of teams who are already using Project Board to stay organised and productive.
-            </p>
-            {user ? (
-              <Link
-                to="/boards"
-                className="bg-blue-600 text-white font-semibold rounded-xl px-8 py-4 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105"
-              >
-                Create Your First Board
-              </Link>
-            ) : (
-              <Link
-                to="/register"
-                className="bg-blue-600 text-white font-semibold rounded-xl px-8 py-4 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105"
-              >
-                Start Free Today
-              </Link>
-            )}
+        {/* What You Can Do Section */}
+        <div className="bg-white rounded-3xl shadow-xl p-12 max-w-4xl mx-auto">
+          <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">
+            What You Can Do
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Board Management</h3>
+              <ul className="space-y-2 text-gray-600">
+                <li className="flex items-center">
+                  <svg className="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Create custom boards with multiple columns
+                </li>
+                <li className="flex items-center">
+                  <svg className="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Add, edit, and delete columns
+                </li>
+                <li className="flex items-center">
+                  <svg className="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Share boards with team members
+                </li>
+                <li className="flex items-center">
+                  <svg className="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Delete boards when no longer needed
+                </li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Card Management</h3>
+              <ul className="space-y-2 text-gray-600">
+                <li className="flex items-center">
+                  <svg className="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Create cards with titles and descriptions
+                </li>
+                <li className="flex items-center">
+                  <svg className="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Drag and drop cards between columns
+                </li>
+                <li className="flex items-center">
+                  <svg className="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Edit card titles and descriptions
+                </li>
+                <li className="flex items-center">
+                  <svg className="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Delete cards when completed
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>
