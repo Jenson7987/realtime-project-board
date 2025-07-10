@@ -223,6 +223,46 @@ const BoardView: React.FC = () => {
       return;
     }
 
+    const prevCards = board.cards;
+    const cardsCopy = board.cards.map(c => ({ ...c }));
+    const movingCard = cardsCopy.find(c => c._id === draggableId);
+    if (!movingCard) return;
+
+    const columnsMap: Record<string, Card[]> = {};
+    cardsCopy.forEach(c => {
+      const columnIdStr = c.columnId.toString();
+      if (!columnsMap[columnIdStr]) columnsMap[columnIdStr] = [];
+      columnsMap[columnIdStr].push(c);
+    });
+    Object.values(columnsMap).forEach(list => list.sort((a, b) => a.position - b.position));
+
+    const sourceList = columnsMap[source.droppableId];
+    const destList = columnsMap[destination.droppableId] || (columnsMap[destination.droppableId] = []);
+
+    const toColumn = destination.droppableId;
+
+    movingCard.columnId = toColumn;
+    movingCard.position = destination.index;
+
+    const currentIndex = sourceList.findIndex(c => c._id === draggableId);
+    if (currentIndex === -1) return;
+    sourceList.splice(currentIndex, 1);
+
+    let destIdx = destination.index;
+    if (destIdx > destList.length) destIdx = destList.length;
+    destList.splice(destIdx, 0, movingCard);
+
+    Object.entries(columnsMap).forEach(([colId, list]) => {
+      list.forEach((c, idx) => {
+        c.columnId = colId;
+        c.position = idx;
+      });
+    });
+
+    const updatedCards = Object.values(columnsMap).flat();
+    
+    setBoard(prev => (prev ? { ...prev, cards: updatedCards } : prev));
+
     try {
       const response = await fetch(`${API_BASE_URL}/cards/${board._id}/${draggableId}`, {
         method: 'PUT',
@@ -241,6 +281,7 @@ const BoardView: React.FC = () => {
       }
     } catch (error) {
       console.error('Error updating card position:', error);
+      setBoard(prev => (prev ? { ...prev, cards: prevCards } : prev));
     }
   };
 
@@ -351,6 +392,22 @@ const BoardView: React.FC = () => {
     if (!selectedCard || !board) return;
     setIsSubmitting(true);
 
+    const updatedCard = {
+      ...selectedCard,
+      title: editedCardTitle,
+      description: editedCardDescription
+    };
+
+    setBoard(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        cards: prev.cards.map(card => 
+          card._id === selectedCard._id ? updatedCard : card
+        )
+      };
+    });
+
     try {
       const response = await fetch(
         `${API_BASE_URL}/cards/${board._id}/${selectedCard._id}`,
@@ -372,6 +429,15 @@ const BoardView: React.FC = () => {
       closeCardModal();
     } catch (error) {
       console.error('Error updating card:', error);
+      setBoard(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          cards: prev.cards.map(card => 
+            card._id === selectedCard._id ? selectedCard : card
+          )
+        };
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -381,6 +447,14 @@ const BoardView: React.FC = () => {
     if (!selectedCard || !board) return;
     setIsDeletingCard(true);
     setCardError(null);
+
+    setBoard(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        cards: prev.cards.filter(card => card._id !== selectedCard._id)
+      };
+    });
 
     try {
       const response = await fetch(
@@ -402,6 +476,13 @@ const BoardView: React.FC = () => {
       closeCardModal();
     } catch (error) {
       console.error('Error deleting card:', error);
+      setBoard(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          cards: [...prev.cards, selectedCard]
+        };
+      });
       if (error instanceof Error) {
         setCardError(error.message);
       } else {
@@ -452,6 +533,16 @@ const BoardView: React.FC = () => {
       return;
     }
     
+    setBoard(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        columns: prev.columns.map(col => 
+          col._id === editingColumnId ? { ...col, title: newTitle } : col
+        )
+      };
+    });
+    
     try {
       const url = `${API_BASE_URL}/boards/${board._id}/columns/${editingColumnId}`;
       
@@ -471,6 +562,15 @@ const BoardView: React.FC = () => {
       }
     } catch (err) {
       console.error('Error updating column title:', err);
+      setBoard(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          columns: prev.columns.map(col => 
+            col._id === editingColumnId ? { ...col, title: col.title } : col
+          )
+        };
+      });
     } finally {
       setEditingColumnId(null);
       setEditingColumnTitle('');
