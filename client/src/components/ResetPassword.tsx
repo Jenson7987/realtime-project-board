@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
-import Logo from './Logo';
 
 const ResetPassword: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -93,7 +92,6 @@ const ResetPassword: React.FC = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="mt-6 text-center">
-          <Logo className="mx-auto mb-4" />
           <h2 className="text-3xl font-extrabold text-gray-900">
             Set new password
           </h2>
