@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import Logo from './Logo';
 
 const Register: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -83,9 +84,12 @@ const Register: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Create your account
-        </h2>
+        <div className="mt-6 text-center">
+          <Logo className="mx-auto mb-4" />
+          <h2 className="text-3xl font-extrabold text-gray-900">
+            Create your account
+          </h2>
+        </div>
         <p className="mt-2 text-center text-sm text-gray-600">
           Or{' '}
           <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">

@@ -12,6 +12,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useSocket } from './hooks/useSocket';
 import ShareBoardModal from './components/ShareBoardModal';
 import { getAvatarColor, getInitials } from './utils/avatarColors';
+import Logo from './components/Logo';
 
 const BoardView: React.FC = () => {
   const { token, isAuthenticated, isLoading, user, logout } = useAuth();
@@ -679,15 +680,8 @@ const BoardView: React.FC = () => {
       <header className="board-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-            <Link
-              to="/boards"
-              className="btn btn-ghost"
-              style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M19 12H5M12 19l-7-7 7-7"/>
-              </svg>
-              <span>Back to Boards</span>
+            <Link to="/boards">
+              <Logo className="hover:opacity-80 transition-opacity" />
             </Link>
             
             <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--color-gray-300)' }}></div>
@@ -724,14 +718,14 @@ const BoardView: React.FC = () => {
             {/* Board Menu */}
             <div className="board-menu-container">
               <button
-                className="board-menu-trigger"
+                className="board-menu-trigger p-2 rounded-lg hover:bg-gray-100 transition-colors"
                 onClick={() => setShowBoardMenu(!showBoardMenu)}
                 title="Board options"
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                  <circle cx="12" cy="12" r="1"/>
-                  <circle cx="19" cy="12" r="1"/>
-                  <circle cx="5" cy="12" r="1"/>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" className="text-gray-600 hover:text-gray-800">
+                  <circle cx="12" cy="12" r="2"/>
+                  <circle cx="19" cy="12" r="2"/>
+                  <circle cx="5" cy="12" r="2"/>
                 </svg>
               </button>
               

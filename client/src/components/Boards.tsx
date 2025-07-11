@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { API_BASE_URL } from '../config';
 import { Board } from '../types';
 import { getAvatarColor, getInitials } from '../utils/avatarColors';
+import Logo from './Logo';
 
 const Boards: React.FC = () => {
   const { user, token, logout } = useAuth();
@@ -201,32 +202,18 @@ const Boards: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center space-x-6">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                  </svg>
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-blue-700">
-                    Project Board
-                  </h1>
-                  <p className="text-sm text-gray-500">Organise your work</p>
-                </div>
-              </div>
-              <nav className="hidden md:flex items-center space-x-8">
-                <Link
-                  to="/"
-                  className="text-gray-700 hover:text-blue-600 font-medium transition-colors"
-                >
-                  Home
-                </Link>
-                <Link
-                  to="/boards"
-                  className="text-blue-600 font-medium"
-                >
-                  My Boards
-                </Link>
+                <nav className="hidden md:flex items-center space-x-8">
+                  <Link to="/">
+                    <Logo className="hover:opacity-80 transition-opacity" />
+                  </Link>
+                {user && (
+                  <Link
+                    to="/boards"
+                    className="text-gray-700 hover:text-blue-600 font-medium transition-colors"
+                  >
+                    My Boards
+                  </Link>
+                )}
               </nav>
             </div>
             <div className="flex items-center space-x-4">
