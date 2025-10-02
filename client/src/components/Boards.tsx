@@ -279,7 +279,7 @@ const Boards: React.FC = () => {
         {/* Welcome Section */}
         <div className="text-center mb-12">
           <h2 className="text-4xl font-bold text-gray-900 mb-4">
-            Welcome back, {user?.firstName}! 👋
+            Welcome back, {user?.firstName}!
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Create and manage your project boards. Get started with a sample board or build your own from scratch.
