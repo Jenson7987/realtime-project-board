@@ -1,7 +1,8 @@
 # Project Board
 
 A real-time collaboration tool for organizing work with drag-and-drop interface. Built with React, Node.js, Socket.IO, and MongoDB.
-[Display Text](https://realtime-project-board.netlify.app/)
+
+[Demo](https://realtime-project-board.netlify.app/)
 
 ## Features
 
