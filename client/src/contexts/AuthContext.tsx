@@ -4,25 +4,21 @@ import { API_BASE_URL } from '../config';
 interface User {
   id: string;
   username: string;
-  email: string;
   firstName: string;
   lastName: string;
-  isEmailVerified: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (username: string, password: string) => Promise<void>;
-  register: (username: string, email: string, password: string, firstName: string, lastName: string) => Promise<void>;
+  register: (username: string, password: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => void;
   updateUser: (updatedUser: User) => void;
   isAuthenticated: boolean;
   isLoading: boolean;
-  requiresVerification: boolean;
   isBackendOnline: boolean;
   checkBackendStatus: () => Promise<void>;
-  clearVerification: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,7 +28,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [isLoading, setIsLoading] = useState(!!localStorage.getItem('token'));
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [requiresVerification, setRequiresVerification] = useState(false);
   const [isBackendOnline, setIsBackendOnline] = useState(true);
 
   useEffect(() => {
@@ -53,16 +48,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const userData = await response.json();
           // Map _id to id for consistency with the interface
           const mappedUser = {
-            ...userData,
             id: userData._id || userData.id,
-            isEmailVerified: userData.isEmailVerified || false
+            username: userData.username,
+            firstName: userData.firstName,
+            lastName: userData.lastName
           };
           setUser(mappedUser);
-          
-          // Check if user needs verification
-          if (!mappedUser.isEmailVerified) {
-            setRequiresVerification(true);
-          }
         } else {
           // If token is invalid, clear everything
           localStorage.removeItem('token');
@@ -98,13 +89,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Login response data:', data);
 
       if (!response.ok) {
-        if (response.status === 403 && data.requiresVerification) {
-          // User needs to verify email
-          setRequiresVerification(true);
-          setUser(data.user);
-          setToken(localStorage.getItem('token')); // Keep existing token
-          throw new Error('Please verify your email address before logging in');
-        }
         throw new Error(data.error || 'Failed to login');
       }
 
@@ -113,12 +97,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(data.token);
       // Map _id to id for consistency with the interface
       const mappedUser = {
-        ...data.user,
         id: data.user._id || data.user.id,
-        isEmailVerified: data.user.isEmailVerified || false
+        username: data.user.username,
+        firstName: data.user.firstName,
+        lastName: data.user.lastName
       };
       setUser(mappedUser);
-      setRequiresVerification(false);
       console.log('Login successful');
     } catch (error) {
       console.error('Login error:', error);
@@ -126,13 +110,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const register = async (username: string, email: string, password: string, firstName: string, lastName: string) => {
+  const register = async (username: string, password: string, firstName: string, lastName: string) => {
     const response = await fetch(`${API_BASE_URL}/auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ username, email, password, firstName, lastName })
+      body: JSON.stringify({ username, password, firstName, lastName })
     });
 
     if (!response.ok) {
@@ -145,23 +129,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setToken(data.token);
     // Map _id to id for consistency with the interface
     const mappedUser = {
-      ...data.user,
       id: data.user._id || data.user.id,
-      isEmailVerified: data.user.isEmailVerified || false
+      username: data.user.username,
+      firstName: data.user.firstName,
+      lastName: data.user.lastName
     };
     setUser(mappedUser);
-    
-    // Check if verification is required
-    if (data.requiresVerification) {
-      setRequiresVerification(true);
-    }
   };
 
   const updateUser = (updatedUser: User) => {
     setUser(updatedUser);
-    if (updatedUser.isEmailVerified) {
-      setRequiresVerification(false);
-    }
   };
 
   const logout = () => {
@@ -169,7 +146,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('token');
     setToken(null);
     setUser(null);
-    setRequiresVerification(false);
     
     // Use setTimeout to ensure state is cleared before navigation
     setTimeout(() => {
@@ -177,13 +153,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Use window.location to force navigation to home page and clear any cached state
       window.location.href = '/';
     }, 100);
-  };
-
-  const clearVerification = () => {
-    setRequiresVerification(false);
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('token');
   };
 
   const checkBackendStatus = async () => {
@@ -217,10 +186,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updateUser,
       isAuthenticated: !!token && !!user && !isLoggingOut,
       isLoading: isLoading,
-      requiresVerification,
       isBackendOnline,
-      checkBackendStatus,
-      clearVerification
+      checkBackendStatus
     }}>
       {children}
     </AuthContext.Provider>

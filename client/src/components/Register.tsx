@@ -4,7 +4,6 @@ import { useAuth } from '../contexts/AuthContext';
 
 const Register: React.FC = () => {
   const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [password, setPassword] = useState('');
@@ -71,8 +70,8 @@ const Register: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await register(username, email, password, firstName, lastName);
-      navigate('/verify-email');
+      await register(username, password, firstName, lastName);
+      navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to register');
     } finally {
@@ -164,25 +163,6 @@ const Register: React.FC = () => {
                     placeholder="Last name"
                   />
                 </div>
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email Address
-              </label>
-              <div className="mt-1">
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="Enter your email"
-                />
               </div>
             </div>
 

@@ -87,7 +87,7 @@ const Login: React.FC = () => {
 
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-gray-700">
-                Username or Email
+                Username
               </label>
               <div className="mt-1">
                 <input
@@ -99,7 +99,7 @@ const Login: React.FC = () => {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="Enter your username or email"
+                  placeholder="Enter your username"
                 />
               </div>
             </div>
@@ -120,11 +120,6 @@ const Login: React.FC = () => {
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   placeholder="Enter your password"
                 />
-              </div>
-              <div className="mt-2 text-right">
-                <Link to="/forgot-password" className="text-sm text-blue-600 hover:text-blue-500">
-                  Forgot your password?
-                </Link>
               </div>
             </div>
 

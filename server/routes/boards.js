@@ -20,7 +20,7 @@ router.get('/', auth, async (req, res) => {
         { sharedWith: { $in: [req.user._id] } }
       ]
     })
-    .populate('owner', 'username email firstName lastName')
+    .populate('owner', 'username firstName lastName')
     .populate('cards.createdBy', 'username firstName lastName')
     .populate('cards.modifiedBy', 'username firstName lastName')
     .sort({ updatedAt: -1 }); // Sort by last modified, newest first
@@ -65,7 +65,7 @@ router.get('/:boardId/collaborators', auth, async (req, res) => {
     }
 
     // Get owner information
-    const owner = await User.findById(board.owner).select('username firstName lastName email');
+    const owner = await User.findById(board.owner).select('username firstName lastName');
 
     if (!owner) {
       console.error('Owner not found for board:', boardId);
@@ -73,22 +73,20 @@ router.get('/:boardId/collaborators', auth, async (req, res) => {
     }
 
     // Get all shared users
-    const sharedUsers = await User.find({ _id: { $in: board.sharedWith } }).select('username firstName lastName email');
+    const sharedUsers = await User.find({ _id: { $in: board.sharedWith } }).select('username firstName lastName');
 
     const response = {
       owner: {
         _id: owner._id,
         username: owner.username,
         firstName: owner.firstName,
-        lastName: owner.lastName,
-        email: owner.email
+        lastName: owner.lastName
       },
       collaborators: sharedUsers.map(user => ({
         _id: user._id,
         username: user.username,
         firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email
+        lastName: user.lastName
       }))
     };
 
@@ -118,7 +116,7 @@ router.get('/:username/:slug', auth, async (req, res) => {
         { sharedWith: { $in: [req.user._id] } }
       ]
     })
-    .populate('owner', 'username email firstName lastName')
+    .populate('owner', 'username firstName lastName')
     .populate('cards.createdBy', 'username firstName lastName')
     .populate('cards.modifiedBy', 'username firstName lastName');
 
@@ -205,7 +203,7 @@ router.get('/slug/:slug', auth, async (req, res) => {
         { sharedWith: { $in: [req.user._id] } }
       ]
     })
-    .populate('owner', 'username email firstName lastName')
+    .populate('owner', 'username firstName lastName')
     .populate('cards.createdBy', 'username firstName lastName')
     .populate('cards.modifiedBy', 'username firstName lastName');
 
@@ -266,7 +264,7 @@ router.post('/:boardId/share', auth, async (req, res) => {
 
     if (!userToShare) {
       const searchTerm = username || email;
-      return res.status(404).json({ error: `User not found with ${username ? 'username' : 'email'}: ${searchTerm}` });
+      return res.status(404).json({ error: `User not found with ${username ? 'username firstName lastName' : 'email'}: ${searchTerm}` });
     }
 
     // Check if user is trying to share with themselves
@@ -370,7 +368,7 @@ router.get('/:boardId', auth, async (req, res) => {
         { owner: req.user._id },
         { sharedWith: { $in: [req.user._id] } }
       ]
-    }).populate('owner', 'username email firstName lastName');
+    }).populate('owner', 'username firstName lastName');
 
     if (!board) {
       return res.status(404).json({ error: 'Board not found' });

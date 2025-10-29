@@ -6,14 +6,10 @@ import Home from './components/Home';
 import Boards from './components/Boards';
 import Login from './components/Login';
 import Register from './components/Register';
-import VerifyEmail from './components/VerifyEmail';
-import EmailVerification from './components/EmailVerification';
-import ForgotPassword from './components/ForgotPassword';
-import ResetPassword from './components/ResetPassword';
 import BackendStatus from './components/BackendStatus';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, requiresVerification } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   
   // Show loading while authentication is being checked
   if (isLoading) {
@@ -24,22 +20,10 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
     );
   }
   
-  // Redirect to verification page if user needs to verify email
-  if (requiresVerification) {
-    return <Navigate to="/verify-email" replace />;
-  }
-  
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { requiresVerification } = useAuth();
-  
-  // If user needs verification, redirect to verification page
-  if (requiresVerification) {
-    return <Navigate to="/verify-email" replace />;
-  }
-  
   // Allow authenticated users to access public routes (like login) but show a message
   return <>{children}</>;
 }
@@ -63,30 +47,6 @@ function App() {
             element={
               <PublicRoute>
                 <Register />
-              </PublicRoute>
-            }
-          />
-          <Route
-            path="/verify-email"
-            element={<EmailVerification />}
-          />
-          <Route
-            path="/verify-email-link"
-            element={<VerifyEmail />}
-          />
-          <Route
-            path="/forgot-password"
-            element={
-              <PublicRoute>
-                <ForgotPassword />
-              </PublicRoute>
-            }
-          />
-          <Route
-            path="/reset-password"
-            element={
-              <PublicRoute>
-                <ResetPassword />
               </PublicRoute>
             }
           />

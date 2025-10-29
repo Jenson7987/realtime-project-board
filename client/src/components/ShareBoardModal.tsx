@@ -64,11 +64,6 @@ const ShareBoardModal: React.FC<ShareBoardModalProps> = ({
 
     try {
       const input = shareInput.trim();
-      const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input);
-      
-      const requestBody = isEmail 
-        ? { email: input }
-        : { username: input };
 
       const response = await fetch(`${API_BASE_URL}/boards/${boardId}/share`, {
         method: 'POST',
@@ -76,7 +71,7 @@ const ShareBoardModal: React.FC<ShareBoardModalProps> = ({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify({ username: input })
       });
 
       const data = await response.json();
@@ -183,7 +178,7 @@ const ShareBoardModal: React.FC<ShareBoardModalProps> = ({
                   type="text"
                   value={shareInput}
                   onChange={(e) => setShareInput(e.target.value)}
-                  placeholder="Enter username or email"
+                  placeholder="Enter username"
                   className="input"
                   style={{ flex: 1 }}
                   disabled={isSharing}
@@ -202,7 +197,7 @@ const ShareBoardModal: React.FC<ShareBoardModalProps> = ({
                 color: 'var(--color-gray-500)',
                 marginBottom: 'var(--space-3)'
               }}>
-                Enter a username (e.g., "john") or email address (e.g., "john@example.com")
+                Enter a username (e.g., "john_smith")
               </p>
               
               {shareError && (
