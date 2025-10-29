@@ -56,11 +56,20 @@ router.post('/register', async (req, res) => {
     });
   } catch (err) {
     console.error('Registration error:', err);
+    
+    // Handle validation errors
+    if (err.name === 'ValidationError') {
+      const messages = Object.values(err.errors).map(e => e.message);
+      return res.status(400).json({ error: messages.join(', ') });
+    }
+    
+    // Handle duplicate key errors
     if (err.code === 11000) {
       if (err.keyPattern.username) {
         return res.status(400).json({ error: 'Username already taken' });
       }
     }
+    
     res.status(500).json({ error: 'Failed to register user' });
   }
 });
